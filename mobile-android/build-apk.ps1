@@ -53,7 +53,7 @@ Write-Host "6. Zipalign APK..." -ForegroundColor Cyan
 if ($LASTEXITCODE -ne 0) { throw "zipalign failed" }
 
 Write-Host "7. Signing APK with debug keystore..." -ForegroundColor Cyan
-$keystore = Join-Path $build "debug.keystore"
+$keystore = Join-Path $root "debug.keystore"
 if (-not (Test-Path $keystore)) {
     & $keytool -genkey -v -keystore $keystore -alias androiddebugkey -storepass android -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=CloudSSD,O=CloudSSD,C=US"
 }

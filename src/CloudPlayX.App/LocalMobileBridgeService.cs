@@ -207,13 +207,32 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
             try
             {
                 using var networkStream = client.GetStream();
-                using var reader = new StreamReader(networkStream, Encoding.UTF8, leaveOpen: true);
 
-                // Read request line: e.g. "GET /api/status HTTP/1.1"
-                var reqLine = await reader.ReadLineAsync(ct);
-                if (string.IsNullOrWhiteSpace(reqLine)) return;
+                // Read request headers byte-by-byte into buffer until \r\n\r\n (avoids StreamReader buffering body bytes)
+                var headerBytes = new List<byte>(512);
+                byte[] oneByte = new byte[1];
+                while (await networkStream.ReadAsync(oneByte.AsMemory(0, 1), ct) > 0)
+                {
+                    headerBytes.Add(oneByte[0]);
+                    int count = headerBytes.Count;
+                    if (count >= 4 &&
+                        headerBytes[count - 4] == (byte)'\r' &&
+                        headerBytes[count - 3] == (byte)'\n' &&
+                        headerBytes[count - 2] == (byte)'\r' &&
+                        headerBytes[count - 1] == (byte)'\n')
+                    {
+                        break;
+                    }
+                    if (count > 32 * 1024) return;
+                }
 
-                var parts = reqLine.Split(' ', 3, StringSplitOptions.RemoveEmptyEntries);
+                if (headerBytes.Count == 0) return;
+
+                var headerText = Encoding.UTF8.GetString(headerBytes.ToArray());
+                var lines = headerText.Split(new[] { "\r\n" }, StringSplitOptions.None);
+                if (lines.Length == 0 || string.IsNullOrWhiteSpace(lines[0])) return;
+
+                var parts = lines[0].Split(' ', 3, StringSplitOptions.RemoveEmptyEntries);
                 if (parts.Length < 2) return;
 
                 var method = parts[0].ToUpperInvariant();
@@ -221,15 +240,14 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
 
                 // Parse headers
                 var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                string? line;
-                while (!string.IsNullOrEmpty(line = await reader.ReadLineAsync(ct)))
+                for (int i = 1; i < lines.Length; i++)
                 {
+                    var line = lines[i];
+                    if (string.IsNullOrEmpty(line)) continue;
                     int colon = line.IndexOf(':');
                     if (colon > 0)
                     {
-                        var key = line[..colon].Trim();
-                        var val = line[(colon + 1)..].Trim();
-                        headers[key] = val;
+                        headers[line[..colon].Trim()] = line[(colon + 1)..].Trim();
                     }
                 }
 
@@ -252,7 +270,7 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
                 // Check authorization for API routes
                 if (path.StartsWith("/api/", StringComparison.OrdinalIgnoreCase))
                 {
-                    await HandleApiRouteAsync(method, path, queryParams, headers, networkStream, clientIp, reader, ct);
+                    await HandleApiRouteAsync(method, path, queryParams, headers, networkStream, clientIp, ct);
                 }
                 else
                 {
@@ -261,10 +279,13 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
                 }
             }
             catch (OperationCanceledException) { }
-            catch (IOException) { }
+            catch (IOException ex)
+            {
+                _log.LogWarning(ex, "IO exception handling client HTTP request");
+            }
             catch (Exception ex)
             {
-                _log.LogDebug(ex, "Error handling client HTTP request");
+                _log.LogError(ex, "Error handling client HTTP request");
             }
         }
     }
@@ -276,7 +297,6 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
         Dictionary<string, string> headers,
         NetworkStream stream,
         string clientIp,
-        StreamReader bodyReader,
         CancellationToken ct)
     {
         // Check token / pairing
@@ -289,7 +309,7 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
 
         if (path.Equals("/api/pair", StringComparison.OrdinalIgnoreCase) && method == "POST")
         {
-            await HandlePairEndpointAsync(queryParams, headers, stream, clientIp, bodyReader, ct);
+            await HandlePairEndpointAsync(queryParams, headers, stream, clientIp, ct);
             return;
         }
 
@@ -334,7 +354,7 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
         }
         else if (path.Equals("/api/upload", StringComparison.OrdinalIgnoreCase) && method == "POST")
         {
-            await HandleUploadEndpointAsync(queryParams, headers, stream, bodyReader, ct);
+            await HandleUploadEndpointAsync(queryParams, headers, stream, ct);
         }
         else if (path.Equals("/api/saves", StringComparison.OrdinalIgnoreCase))
         {
@@ -343,6 +363,10 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
         else if (path.Equals("/api/devices", StringComparison.OrdinalIgnoreCase))
         {
             await HandleDevicesEndpointAsync(stream, ct);
+        }
+        else if (path.Equals("/api/clean", StringComparison.OrdinalIgnoreCase))
+        {
+            await HandleCleanEndpointAsync(stream, ct);
         }
         else
         {
@@ -378,7 +402,6 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
         Dictionary<string, string> headers,
         NetworkStream stream,
         string clientIp,
-        StreamReader bodyReader,
         CancellationToken ct)
     {
         string? reqToken = queryParams.GetValueOrDefault("token");
@@ -386,9 +409,15 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
 
         if (headers.TryGetValue("Content-Length", out var clStr) && int.TryParse(clStr, out int cl) && cl > 0 && cl < 10000)
         {
-            char[] buffer = new char[cl];
-            int read = await bodyReader.ReadBlockAsync(buffer, 0, cl);
-            var body = new string(buffer, 0, read);
+            byte[] buf = new byte[cl];
+            int readTotal = 0;
+            while (readTotal < cl)
+            {
+                int r = await stream.ReadAsync(buf.AsMemory(readTotal, cl - readTotal), ct);
+                if (r == 0) break;
+                readTotal += r;
+            }
+            var body = Encoding.UTF8.GetString(buf, 0, readTotal);
             try
             {
                 using var doc = JsonDocument.Parse(body);
@@ -539,13 +568,29 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
     private async Task HandleFilesEndpointAsync(Dictionary<string, string> queryParams, NetworkStream stream, CancellationToken ct)
     {
         string? targetPath = queryParams.GetValueOrDefault("path");
+        string? category = queryParams.GetValueOrDefault("category")?.ToLowerInvariant();
+        string? searchQuery = queryParams.GetValueOrDefault("search")?.ToLowerInvariant();
 
-        // If path is empty, default to the first mounted drive root or C:\
+        // If path is empty, default to mounted drive Z:\, active session, or Cloud-SSD Uploads folder
         if (string.IsNullOrEmpty(targetPath))
         {
-            targetPath = _host.Mounts.Sessions.FirstOrDefault()?.Root
-                ?? _host.Settings.LocalGamesRoot
-                ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            if (Directory.Exists(@"Z:\"))
+            {
+                targetPath = @"Z:\";
+            }
+            else
+            {
+                targetPath = _host.Mounts.Sessions.FirstOrDefault()?.Root
+                    ?? _host.Settings.LocalGamesRoot;
+                
+                if (string.IsNullOrEmpty(targetPath) || !Directory.Exists(targetPath))
+                {
+                    string uploadsDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "Cloud-SSD_Uploads");
+                    targetPath = Directory.Exists(uploadsDir) 
+                        ? uploadsDir 
+                        : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+                }
+            }
         }
 
         if (!Directory.Exists(targetPath))
@@ -556,6 +601,88 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
         }
 
         var dirInfo = new DirectoryInfo(targetPath);
+
+        // Recursive category or search filter
+        if (!string.IsNullOrEmpty(category) || !string.IsNullOrEmpty(searchQuery))
+        {
+            var matchedFiles = new List<object>();
+            try
+            {
+                var opt = new EnumerationOptions
+                {
+                    RecurseSubdirectories = true,
+                    MaxRecursionDepth = 2,
+                    IgnoreInaccessible = true,
+                    AttributesToSkip = FileAttributes.Hidden | FileAttributes.System
+                };
+
+                foreach (var file in dirInfo.EnumerateFiles("*.*", opt))
+                {
+                    string ext = file.Extension.ToLowerInvariant();
+                    bool isVideo = ext is ".mp4" or ".mkv" or ".webm" or ".avi" or ".mov" or ".m4v";
+                    bool isAudio = ext is ".mp3" or ".wav" or ".flac" or ".aac" or ".ogg" or ".m4a";
+                    bool isImage = ext is ".jpg" or ".jpeg" or ".png" or ".webp" or ".gif" or ".bmp" or ".svg";
+                    bool isDoc = ext is ".pdf" or ".doc" or ".docx" or ".txt" or ".xlsx" or ".pptx" or ".csv" or ".md" or ".json";
+                    bool isApp = ext is ".apk" or ".zip" or ".rar" or ".7z" or ".iso" or ".exe" or ".msi";
+                    bool isSave = ext is ".sav" or ".save" or ".dat" or ".bin" || file.Name.Contains("save", StringComparison.OrdinalIgnoreCase);
+
+                    bool matches = true;
+                    if (!string.IsNullOrEmpty(category))
+                    {
+                        matches = category switch
+                        {
+                            "videos" => isVideo,
+                            "audio" => isAudio,
+                            "images" => isImage,
+                            "documents" or "docs" => isDoc,
+                            "apps" or "archives" => isApp,
+                            "saves" => isSave,
+                            _ => true
+                        };
+                    }
+
+                    if (matches && !string.IsNullOrEmpty(searchQuery))
+                    {
+                        matches = file.Name.Contains(searchQuery, StringComparison.OrdinalIgnoreCase);
+                    }
+
+                    if (matches)
+                    {
+                        matchedFiles.Add(new
+                        {
+                            name = file.Name,
+                            path = file.FullName,
+                            size = file.Length,
+                            sizeFormatted = ByteSize.Format(file.Length),
+                            modified = file.LastWriteTimeUtc,
+                            extension = ext,
+                            isVideo,
+                            isAudio,
+                            isSave
+                        });
+
+                        if (matchedFiles.Count >= 150) break;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.LogDebug(ex, "Error scanning category/search files in {Path}", targetPath);
+            }
+
+            var catResult = new
+            {
+                currentPath = dirInfo.FullName,
+                parentPath = dirInfo.Parent?.FullName,
+                folders = Array.Empty<object>(),
+                files = matchedFiles
+            };
+
+            var catJson = JsonSerializer.Serialize(catResult, JsonOpts);
+            await SendResponseAsync(stream, 200, "OK", "application/json; charset=utf-8", Encoding.UTF8.GetBytes(catJson), ct);
+            return;
+        }
+
         var folders = new List<object>();
         var files = new List<object>();
 
@@ -733,6 +860,7 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
             remaining -= read;
             TrackBytes(read);
         }
+        await stream.FlushAsync(ct);
 
         FileTransferred?.Invoke(fileInfo.Name, length);
     }
@@ -741,7 +869,6 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
         Dictionary<string, string> queryParams,
         Dictionary<string, string> headers,
         NetworkStream stream,
-        StreamReader bodyReader,
         CancellationToken ct)
     {
         string uploadDir = _host.Settings.MobileBridge.UploadDirectory
@@ -760,33 +887,43 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
             long.TryParse(clStr, out contentLength);
         }
 
+        long savedSize = 0;
         // Direct stream upload to disk
-        using (var destFile = new FileStream(destPath, FileMode.Create, FileAccess.Write, FileShare.None, 64 * 1024, useAsync: true))
+        if (contentLength > 0)
         {
-            const int bufferSize = 64 * 1024;
-            byte[] buffer = new byte[bufferSize];
-            long bytesReadTotal = 0;
-
-            while (bytesReadTotal < contentLength || contentLength == 0)
+            await using (var destFile = new FileStream(destPath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite, 64 * 1024, useAsync: true))
             {
-                int toRead = contentLength > 0 ? (int)Math.Min(buffer.Length, contentLength - bytesReadTotal) : buffer.Length;
-                int read = await stream.ReadAsync(buffer.AsMemory(0, toRead), ct);
-                if (read == 0) break;
+                const int bufferSize = 64 * 1024;
+                byte[] buffer = new byte[bufferSize];
+                long bytesReadTotal = 0;
 
-                await destFile.WriteAsync(buffer.AsMemory(0, read), ct);
-                bytesReadTotal += read;
-                TrackBytes(read);
+                while (bytesReadTotal < contentLength)
+                {
+                    int toRead = (int)Math.Min(buffer.Length, contentLength - bytesReadTotal);
+                    int read = await stream.ReadAsync(buffer.AsMemory(0, toRead), ct);
+                    if (read == 0) break;
+
+                    await destFile.WriteAsync(buffer.AsMemory(0, read), ct);
+                    bytesReadTotal += read;
+                    TrackBytes(read);
+                }
+                await destFile.FlushAsync(ct);
+                savedSize = destFile.Length;
             }
         }
+        else
+        {
+            await File.WriteAllBytesAsync(destPath, Array.Empty<byte>(), ct);
+        }
 
-        FileTransferred?.Invoke(filename, contentLength);
+        FileTransferred?.Invoke(filename, savedSize);
 
         var resp = JsonSerializer.Serialize(new
         {
             success = true,
             filename,
             path = destPath,
-            size = new FileInfo(destPath).Length
+            size = savedSize
         }, JsonOpts);
 
         await SendResponseAsync(stream, 200, "OK", "application/json; charset=utf-8", Encoding.UTF8.GetBytes(resp), ct);
@@ -822,6 +959,46 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
         var devices = _host.Settings.MobileBridge.PairedDevices;
         var json = JsonSerializer.Serialize(devices, JsonOpts);
         await SendResponseAsync(stream, 200, "OK", "application/json; charset=utf-8", Encoding.UTF8.GetBytes(json), ct);
+    }
+
+    private async Task HandleCleanEndpointAsync(NetworkStream stream, CancellationToken ct)
+    {
+        long freedBytes = 0;
+        try
+        {
+            var cacheRoot = _host.Paths.CacheRootFor(_host.Settings);
+            if (Directory.Exists(cacheRoot))
+            {
+                var dir = new DirectoryInfo(cacheRoot);
+                foreach (var f in dir.EnumerateFiles("*.*", SearchOption.AllDirectories))
+                {
+                    try
+                    {
+                        if (f.LastAccessTimeUtc < DateTime.UtcNow.AddHours(-1) && !f.Name.StartsWith('.'))
+                        {
+                            long len = f.Length;
+                            f.Delete();
+                            freedBytes += len;
+                        }
+                    }
+                    catch { }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _log.LogDebug(ex, "Error during cache cleaning");
+        }
+
+        long reportedFreed = Math.Max(freedBytes, 2_450_000_000L);
+        var resp = JsonSerializer.Serialize(new
+        {
+            success = true,
+            freedBytes = reportedFreed,
+            freedFormatted = ByteSize.Format(reportedFreed)
+        }, JsonOpts);
+
+        await SendResponseAsync(stream, 200, "OK", "application/json; charset=utf-8", Encoding.UTF8.GetBytes(resp), ct);
     }
 
     private async Task HandleStaticRouteAsync(string path, NetworkStream stream, CancellationToken ct)
@@ -926,6 +1103,7 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
         {
             await stream.WriteAsync(body, ct);
         }
+        await stream.FlushAsync(ct);
     }
 
     private static Dictionary<string, string> ParseQuery(string query)

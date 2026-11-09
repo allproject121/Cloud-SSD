@@ -124,6 +124,7 @@ public sealed class AppHost : IAsyncDisposable
     public async Task InitializeAsync(bool restoreMounts = true, CancellationToken ct = default)
     {
         _log.LogInformation("Cloud-SSD starting (data root {Root})", Paths.DataRoot);
+        if (Settings.MobileBridge.Enabled) MobileBridge.Start();
         Rclone = await RcloneLocator.LocateAsync(Settings.RclonePathOverride, Paths.DataRoot, ct);
         if (Rclone != null)
         {

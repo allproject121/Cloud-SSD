@@ -117,3 +117,12 @@ Poore project aur compiled binary files ki gehri jaanch ki gayi:
 - **Remote**: https://github.com/allproject121/Cloud-Drive.git
 - **Branch**: main
 - **Output**: 198 source files cleanly committed and pushed to GitHub main branch.
+
+### [Step 2.40] - 2026-11-09 14:15:00 IST
+- **Task**: Package and Upload Windows EXE Installer & Android APK
+- **Status**: COMPLETED
+- **Binaries Included**:
+  - eleases/Cloud-SSD-0.7.0-setup.exe (70.7 MB Windows Installer)
+  - eleases/Cloud-SSD-Mobile.apk (1.1 MB Android Companion App)
+  - eleases/Cloud-SSD-0.7.0-setup.exe.sha256 (Verification Checksum)
+- **Output**: Binaries staged and committed to git for direct download via GitHub.

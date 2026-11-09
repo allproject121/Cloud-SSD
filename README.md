@@ -1,5 +1,9 @@
 # Cloud-Drive
 
+### 🚀 Direct Downloads
+* 💻 **Windows Installer (EXE):** [Download Cloud-SSD-0.7.0-setup.exe](releases/Cloud-SSD-0.7.0-setup.exe)
+* 📱 **Android Companion App (APK):** [Download Cloud-SSD-Mobile.apk](releases/Cloud-SSD-Mobile.apk)
+
 **Cloud-to-SSD virtual storage and intelligent game streaming engine for Windows 10/11 (x64).**
 
 Keep your PC games in cloud storage (Google Drive first), see them as a normal drive letter in File Explorer, and run

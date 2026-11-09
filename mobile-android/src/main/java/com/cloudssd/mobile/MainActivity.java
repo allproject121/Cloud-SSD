@@ -69,6 +69,17 @@ public class MainActivity extends Activity {
             }
         });
 
+        webView.setDownloadListener(new android.webkit.DownloadListener() {
+            @Override
+            public void onDownloadStart(String url, String userAgent, String contentDisposition, String mimetype, long contentLength) {
+                try {
+                    Intent i = new Intent(Intent.ACTION_VIEW);
+                    i.setData(Uri.parse(url));
+                    startActivity(i);
+                } catch (Exception ignored) { }
+            }
+        });
+
         webView.loadUrl("file:///android_asset/index.html");
     }
 
@@ -98,10 +109,17 @@ public class MainActivity extends Activity {
 
     @Override
     public void onBackPressed() {
-        if (webView != null && webView.canGoBack()) {
-            webView.goBack();
-        } else {
-            super.onBackPressed();
+        if (webView != null) {
+            webView.evaluateJavascript("window.onAndroidBack ? window.onAndroidBack() : false;", new ValueCallback<String>() {
+                @Override
+                public void onReceiveValue(String value) {
+                    if (!"true".equalsIgnoreCase(value)) {
+                        MainActivity.super.onBackPressed();
+                    }
+                }
+            });
+            return;
         }
+        super.onBackPressed();
     }
 }

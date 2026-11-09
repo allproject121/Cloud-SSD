@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Cloud-SSD Mobile</title>
+  <title>Files</title>
   
   <!-- PWA Meta Tags -->
-  <meta name="theme-color" content="#7C3AED">
+  <meta name="theme-color" content="#121316">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="description" content="Offline Phone Bridge & High-Speed File Vault for Cloud-SSD">
+  <meta name="description" content="Files by Google style file manager and high-speed bridge for Cloud-SSD">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/svg+xml" href="icon-192.svg">
   <link rel="apple-touch-icon" href="icon-192.svg">
@@ -18,320 +18,573 @@
 </head>
 <body>
 
-  <!-- Top App Header -->
-  <header class="app-header">
-    <div class="brand-wrapper">
-      <div class="brand-icon">
-        <svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13h-3v4h-2v-4H6l5-5 5 5h-2z"/></svg>
+  <!-- Top Search Bar (Authentic Google Files Style) -->
+  <div class="search-header">
+    <div class="search-bar-pill">
+      <div class="search-icon">
+        <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
       </div>
-      <div class="brand-title">CLOUD<span>-SSD</span></div>
+      <input type="text" id="global-search-input" placeholder="Search in Files" oninput="handleSearch(this.value)" autocomplete="off">
+      <div id="clear-search-btn" class="clear-search" onclick="clearSearch()" style="display: none;">
+        <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+      </div>
+      <div class="profile-chip" id="profile-chip-btn" onclick="openSettingsModal()" title="PC Connection & Settings">
+        <div class="profile-avatar" id="pc-avatar">R</div>
+        <div class="profile-status-dot" id="header-status-dot"></div>
+      </div>
     </div>
-    <div id="connection-pill" class="status-pill online">
-      <div class="status-dot"></div>
-      <span id="connection-text">Connecting...</span>
-    </div>
-  </header>
+  </div>
 
-  <!-- SCREEN 1: HOME -->
-  <main id="tab-home" class="tab-screen active">
-    <!-- Active Game HUD Banner -->
-    <div id="home-hud-card" class="hud-card" style="display: none;">
-      <div class="hud-header">
+  <!-- TAB 1: BROWSE (Main Google Files Home) -->
+  <main id="tab-browse" class="tab-screen active">
+    <!-- Active Gaming Mini Banner (if PC game running) -->
+    <div id="browse-game-banner" class="mini-hud-banner" style="display: none;" onclick="switchTab('gaming')">
+      <div class="banner-left">
+        <div class="game-icon-badge">
+          <svg viewBox="0 0 24 24"><path d="M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-10 7H8v3H6v-3H3v-2h3V8h2v3h3v2zm4.5 2c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm4-3c-.83 0-1.5-.67-1.5-1.5S18.67 9 19.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
+        </div>
         <div>
-          <span style="font-size: 11px; color: var(--dim); text-transform: uppercase;">🎮 Active PC Game</span>
-          <div id="hud-active-game" class="hud-game-name">Cyberpunk 2077</div>
-        </div>
-        <div class="hud-badge">LIVE COMPANION</div>
-      </div>
-      <div class="hud-grid">
-        <div class="hud-metric">
-          <div id="hud-fps" class="hud-metric-val">74</div>
-          <div class="hud-metric-lbl">FPS</div>
-        </div>
-        <div class="hud-metric">
-          <div id="hud-ssd" class="hud-metric-val purple">112</div>
-          <div class="hud-metric-lbl">SSD MB/s</div>
-        </div>
-        <div class="hud-metric">
-          <div id="hud-hit" class="hud-metric-val green">99%</div>
-          <div class="hud-metric-lbl">Cache Hit</div>
+          <div class="banner-title" id="banner-game-name">Cyberpunk 2077</div>
+          <div class="banner-sub"><span id="banner-fps">75</span> FPS • <span id="banner-ssd">112</span> MB/s SSD Read</div>
         </div>
       </div>
+      <div class="banner-chip">LIVE HUD</div>
     </div>
 
-    <!-- Quick Categories -->
-    <div class="card-title">Categories / श्रेणियाँ</div>
-    <div class="category-grid">
-      <div class="category-btn" onclick="switchTab('files', 'drives')">
-        <div class="category-icon">📁</div>
-        <div>Drives</div>
+    <!-- Recent Files Section -->
+    <div class="section-container" id="recent-section">
+      <div class="section-header">
+        <div class="section-title">Recent</div>
+        <div class="section-action" onclick="refreshRecentFiles()">Refresh</div>
       </div>
-      <div class="category-btn" onclick="openPhotoPicker()">
-        <div class="category-icon">📸</div>
-        <div>Photos</div>
-      </div>
-      <div class="category-btn" onclick="switchTab('files', 'media')">
-        <div class="category-icon">🎬</div>
-        <div>Media</div>
-      </div>
-      <div class="category-btn" onclick="switchTab('gaming')">
-        <div class="category-icon">🎮</div>
-        <div>Saves</div>
-      </div>
-    </div>
-
-    <!-- PC Storage Status -->
-    <div class="card">
-      <div class="card-title">
-        <span>PC Storage & Engine</span>
-        <span id="pc-name-display" style="font-size: 11px; color: var(--cyan);">PC</span>
-      </div>
-      <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 8px;">
-        <span id="storage-summary">Checking storage...</span>
-        <span id="transfer-speed-summary" style="color: var(--cyan); font-weight: 600;">0 MB/s</span>
-      </div>
-      <div style="background: var(--surface-2); border-radius: 6px; height: 10px; overflow: hidden; margin-bottom: 12px;">
-        <div id="storage-progress-bar" style="background: linear-gradient(90deg, var(--purple), var(--cyan)); width: 45%; height: 100%;"></div>
-      </div>
-      <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--dim);">
-        <span id="stat-drives-count">0 Drives Mounted</span>
-        <span id="stat-prefetch-count">Engine Ready</span>
-      </div>
-    </div>
-
-    <!-- Quick Actions -->
-    <div class="card-title">Quick Actions / तुरंत कार्य</div>
-    <div class="quick-action-grid">
-      <div class="action-btn" onclick="triggerFileUpload()">
-        <div class="action-icon">⬆️</div>
-        <div>
-          <div class="action-title">Send to PC</div>
-          <div class="action-sub">Local Wi-Fi Drop</div>
-        </div>
-      </div>
-      <div class="action-btn" onclick="switchTab('gaming')">
-        <div class="action-icon">🔄</div>
-        <div>
-          <div class="action-title">Sync Saves</div>
-          <div class="action-sub">1-Tap Game Sync</div>
-        </div>
-      </div>
-      <div class="action-btn" onclick="switchTab('vault')">
-        <div class="action-icon">💾</div>
-        <div>
-          <div class="action-title">Offline Vault</div>
-          <div class="action-sub">PC Band Bhi Chalega</div>
-        </div>
-      </div>
-      <div class="action-btn" onclick="openPhotoPicker()">
-        <div class="action-icon">📷</div>
-        <div>
-          <div class="action-title">Auto Backup</div>
-          <div class="action-sub">Push Photos to PC</div>
+      <div class="recent-scroll-row" id="recent-scroll-container">
+        <div class="recent-empty-card">
+          <div class="recent-empty-icon">
+            <svg viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+          </div>
+          <div>No recent files yet</div>
         </div>
       </div>
     </div>
 
-    <!-- Recent Transfers -->
-    <div class="card">
-      <div class="card-title">
-        <span>Recent Activity</span>
-        <span onclick="clearRecentActivity()" style="font-size: 11px; color: var(--dim); cursor: pointer;">Clear</span>
+    <!-- Categories Section (Google Files Signature Layout) -->
+    <div class="section-container">
+      <div class="section-title">Categories</div>
+      <div class="categories-list">
+        <!-- Downloads -->
+        <div class="category-row" onclick="filterCategory('downloads', 'Downloads')">
+          <div class="category-icon-box cat-downloads">
+            <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+          </div>
+          <div class="category-text">
+            <div class="category-name">Downloads</div>
+            <div class="category-meta" id="meta-cat-downloads">Offline & Received files</div>
+          </div>
+          <div class="category-arrow">
+            <svg viewBox="0 0 24 24" class="svg-chevron"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+          </div>
+        </div>
+
+        <!-- Images -->
+        <div class="category-row" onclick="filterCategory('images', 'Images')">
+          <div class="category-icon-box cat-images">
+            <svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+          </div>
+          <div class="category-text">
+            <div class="category-name">Images</div>
+            <div class="category-meta" id="meta-cat-images">Photos, Wallpapers, Screenshots</div>
+          </div>
+          <div class="category-arrow">
+            <svg viewBox="0 0 24 24" class="svg-chevron"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+          </div>
+        </div>
+
+        <!-- Videos -->
+        <div class="category-row" onclick="filterCategory('videos', 'Videos')">
+          <div class="category-icon-box cat-videos">
+            <svg viewBox="0 0 24 24"><path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/></svg>
+          </div>
+          <div class="category-text">
+            <div class="category-name">Videos</div>
+            <div class="category-meta" id="meta-cat-videos">High-speed streamable movies & clips</div>
+          </div>
+          <div class="category-arrow">
+            <svg viewBox="0 0 24 24" class="svg-chevron"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+          </div>
+        </div>
+
+        <!-- Audio -->
+        <div class="category-row" onclick="filterCategory('audio', 'Audio')">
+          <div class="category-icon-box cat-audio">
+            <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+          </div>
+          <div class="category-text">
+            <div class="category-name">Audio</div>
+            <div class="category-meta" id="meta-cat-audio">Music, Podcasts, Recordings</div>
+          </div>
+          <div class="category-arrow">
+            <svg viewBox="0 0 24 24" class="svg-chevron"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+          </div>
+        </div>
+
+        <!-- Documents -->
+        <div class="category-row" onclick="filterCategory('documents', 'Documents & other')">
+          <div class="category-icon-box cat-docs">
+            <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+          </div>
+          <div class="category-text">
+            <div class="category-name">Documents & other</div>
+            <div class="category-meta" id="meta-cat-docs">PDFs, Docs, Sheets, Presentations</div>
+          </div>
+          <div class="category-arrow">
+            <svg viewBox="0 0 24 24" class="svg-chevron"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+          </div>
+        </div>
+
+        <!-- Apps & Games -->
+        <div class="category-row" onclick="filterCategory('apps', 'Apps & Archives')">
+          <div class="category-icon-box cat-apps">
+            <svg viewBox="0 0 24 24"><path d="M4 8h4V4H4v4zm6 12h4v-4h-4v4zm-6 0h4v-4H4v4zm0-6h4v-4H4v4zm6 0h4v-4h-4v4zm6-10v4h4V4h-4zm-6 4h4V4h-4v4zm6 6h4v-4h-4v4zm0 6h4v-4h-4v4z"/></svg>
+          </div>
+          <div class="category-text">
+            <div class="category-name">Apps & Archives</div>
+            <div class="category-meta" id="meta-cat-apps">APKs, ZIPs, Archives</div>
+          </div>
+          <div class="category-arrow">
+            <svg viewBox="0 0 24 24" class="svg-chevron"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+          </div>
+        </div>
       </div>
-      <div id="recent-transfers-list" style="font-size: 12.5px; color: var(--dim);">
-        <div>No recent file transfers yet.</div>
+    </div>
+
+    <!-- Collections Section (Google Files Safe Folder Style) -->
+    <div class="section-container">
+      <div class="section-title">Collections</div>
+      <div class="categories-list">
+        <!-- Safe Folder (Offline Vault) -->
+        <div class="category-row" onclick="openSafeFolder()">
+          <div class="category-icon-box cat-safe">
+            <svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+          </div>
+          <div class="category-text">
+            <div class="category-name">Safe folder</div>
+            <div class="category-meta" id="meta-safe-folder">Offline protected storage</div>
+          </div>
+          <div class="category-arrow">
+            <svg viewBox="0 0 24 24" class="svg-chevron"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+          </div>
+        </div>
+
+        <!-- Starred / Quick Access -->
+        <div class="category-row" onclick="openStarredFiles()">
+          <div class="category-icon-box cat-starred">
+            <svg viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+          </div>
+          <div class="category-text">
+            <div class="category-name">Starred</div>
+            <div class="category-meta">Pinned fast-access files</div>
+          </div>
+          <div class="category-arrow">
+            <svg viewBox="0 0 24 24" class="svg-chevron"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Storage Devices Section (Google Files Style) -->
+    <div class="section-container">
+      <div class="section-title">Storage devices</div>
+      <div id="storage-devices-list" class="storage-list">
+        <!-- Dynamically injected drives -->
+        <div class="storage-device-card" onclick="loadDrives()">
+          <div class="storage-dev-icon">
+            <svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13h-3v4h-2v-4H6l5-5 5 5h-2z"/></svg>
+          </div>
+          <div class="storage-dev-info">
+            <div class="storage-dev-title">Cloud-SSD (15TB) (Z:)</div>
+            <div class="storage-dev-sub" id="storage-dev-sub-z">14.8 TB free</div>
+            <div class="storage-bar-track">
+              <div class="storage-bar-fill" id="storage-bar-z" style="width: 2%;"></div>
+            </div>
+          </div>
+          <div class="category-arrow">
+            <svg viewBox="0 0 24 24" class="svg-chevron"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+          </div>
+        </div>
+
+        <div class="storage-device-card" onclick="loadFolder('G:\\')">
+          <div class="storage-dev-icon" style="background: rgba(234, 67, 53, 0.15); color: #EA4335;">
+            <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+          </div>
+          <div class="storage-dev-info">
+            <div class="storage-dev-title">Google Drive (G:)</div>
+            <div class="storage-dev-sub">Cloud storage</div>
+          </div>
+          <div class="category-arrow">
+            <svg viewBox="0 0 24 24" class="svg-chevron"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+          </div>
+        </div>
       </div>
     </div>
   </main>
 
-  <!-- SCREEN 2: FILES -->
-  <main id="tab-files" class="tab-screen">
-    <!-- Breadcrumb Explorer Header -->
-    <div class="card" style="padding: 10px 14px; margin-bottom: 12px;">
-      <div class="explorer-header" id="breadcrumb-bar">
-        <span class="breadcrumb-item" onclick="loadDrives()">🏠 Cloud-SSD</span>
+  <!-- TAB 2: EXPLORER VIEW (Deep File Browsing / Category Views) -->
+  <main id="tab-explorer" class="tab-screen">
+    <!-- Explorer App Bar -->
+    <div class="explorer-top-bar">
+      <div class="exp-back-btn" onclick="navigateBack()" title="Go Back">
+        <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+      </div>
+      <div class="exp-title-box">
+        <div class="exp-title" id="explorer-view-title">Files</div>
+        <div class="exp-breadcrumbs" id="explorer-breadcrumbs">Drives</div>
+      </div>
+      <div class="exp-actions">
+        <button class="exp-icon-btn" onclick="toggleViewLayout()" title="Switch Grid / List View">
+          <svg id="view-toggle-icon" viewBox="0 0 24 24"><path d="M4 8h4V4H4v4zm6 12h4v-4h-4v4zm-6 0h4v-4H4v4zm0-6h4v-4H4v4zm6 0h4v-4h-4v4zm6-10v4h4V4h-4zm-6 4h4V4h-4v4zm6 6h4v-4h-4v4zm0 6h4v-4h-4v4z"/></svg>
+        </button>
+        <button class="exp-icon-btn" onclick="openSortMenu()" title="Sort Files">
+          <svg viewBox="0 0 24 24"><path d="M3 18h6v-2H3v2zM3 6v2h18V6H3zm0 7h12v-2H3v2z"/></svg>
+        </button>
       </div>
     </div>
 
-    <!-- Drives Grid (Visible at Root) -->
-    <div id="drives-container" class="card" style="display: none; padding: 12px;">
-      <div class="card-title">Available Drives & Storage</div>
-      <div id="drives-list" style="display: flex; flex-direction: column; gap: 8px;"></div>
+    <!-- Active Filter Chips -->
+    <div class="filter-chips-row" id="filter-chips-container">
+      <div class="chip active" onclick="setFileFilter('all')">All</div>
+      <div class="chip" onclick="setFileFilter('videos')">Videos</div>
+      <div class="chip" onclick="setFileFilter('images')">Images</div>
+      <div class="chip" onclick="setFileFilter('docs')">Documents</div>
+      <div class="chip" onclick="setFileFilter('archives')">Archives</div>
     </div>
 
-    <!-- File Explorer List -->
-    <div id="files-list-container" class="file-list"></div>
+    <!-- File Items Container -->
+    <div id="explorer-items-container" class="explorer-list-view">
+      <div class="loading-state">Loading files...</div>
+    </div>
   </main>
 
-  <!-- SCREEN 3: GAMING -->
+  <!-- TAB 3: CLEAN (Google Files Style Storage Cleaner) -->
+  <main id="tab-clean" class="tab-screen">
+    <div class="clean-hero-card">
+      <div class="clean-hero-badge">STORAGE</div>
+      <div class="clean-hero-title">Clean up space</div>
+      <div class="clean-hero-desc">Free up space by clearing cached data and reviewing large files.</div>
+      
+      <div class="clean-stats-row">
+        <div class="clean-stat-box">
+          <div class="clean-stat-val" id="clean-cache-size">2.4 GB</div>
+          <div class="clean-stat-lbl">Junk files</div>
+        </div>
+        <div class="clean-stat-box">
+          <div class="clean-stat-val" id="clean-vault-size">0 MB</div>
+          <div class="clean-stat-lbl">Safe folder</div>
+        </div>
+        <div class="clean-stat-box">
+          <div class="clean-stat-val" id="clean-free-space">14.8 TB</div>
+          <div class="clean-stat-lbl">Cloud Free</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cleaner Action Cards -->
+    <div class="clean-card">
+      <div class="clean-card-left">
+        <div class="clean-card-icon" style="background: rgba(234, 67, 53, 0.15); color: #EA4335;">
+          <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+        </div>
+        <div>
+          <div class="clean-card-title">Junk files</div>
+          <div class="clean-card-sub">Temporary cached files that are safe to delete</div>
+        </div>
+      </div>
+      <button class="clean-action-btn" onclick="triggerCleanCache()">Clean (2.4 GB)</button>
+    </div>
+
+    <div class="clean-card">
+      <div class="clean-card-left">
+        <div class="clean-card-icon" style="background: rgba(251, 188, 4, 0.15); color: #FBBC04;">
+          <svg viewBox="0 0 24 24"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-6 10h-4v-2h4v2zm0-4h-4v-2h4v2zm0-4h-4V6h4v2z"/></svg>
+        </div>
+        <div>
+          <div class="clean-card-title">Large files (&gt; 500 MB)</div>
+          <div class="clean-card-sub">Review movies, archives and game packages</div>
+        </div>
+      </div>
+      <button class="clean-action-btn secondary" onclick="filterCategory('videos', 'Large Videos')">Review</button>
+    </div>
+
+    <div class="clean-card">
+      <div class="clean-card-left">
+        <div class="clean-card-icon" style="background: rgba(66, 133, 244, 0.15); color: #4285F4;">
+          <svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+        </div>
+        <div>
+          <div class="clean-card-title">Safe folder storage</div>
+          <div class="clean-card-sub">Manage local offline protected vault</div>
+        </div>
+      </div>
+      <button class="clean-action-btn secondary" onclick="clearVault()">Clear</button>
+    </div>
+  </main>
+
+  <!-- TAB 4: SHARE (Google Files Nearby Share Style) -->
+  <main id="tab-share" class="tab-screen">
+    <div class="share-hero">
+      <div class="share-icon-circle">
+        <svg viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92c0-1.61-1.31-2.92-2.92-2.92z"/></svg>
+      </div>
+      <div class="share-hero-title">Quick Share to PC</div>
+      <div class="share-hero-sub">Fast local Wi-Fi transfer with your PC. No mobile data or internet needed.</div>
+      
+      <div class="share-device-pill">
+        <div class="status-dot"></div>
+        <span>Connected to <strong id="share-pc-name">ROSHAN</strong></span>
+      </div>
+    </div>
+
+    <!-- Big Send & Receive Buttons (Like Google Files) -->
+    <div class="share-action-grid">
+      <div class="share-btn-card" onclick="triggerFileUpload()">
+        <div class="share-btn-icon" style="background: #1A73E8;">
+          <svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>
+        </div>
+        <div class="share-btn-label">Send to PC</div>
+        <div class="share-btn-hint">Send any file or doc</div>
+      </div>
+
+      <div class="share-btn-card" onclick="openPhotoPicker()">
+        <div class="share-btn-icon" style="background: #34A853;">
+          <svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+        </div>
+        <div class="share-btn-label">Send Photos</div>
+        <div class="share-btn-hint">Camera & gallery</div>
+      </div>
+    </div>
+
+    <!-- Transfer Activity Box -->
+    <div class="section-container" style="margin-top: 24px;">
+      <div class="section-header">
+        <div class="section-title">Transfer History</div>
+        <div class="section-action" onclick="clearRecentActivity()">Clear</div>
+      </div>
+      <div id="share-activity-list" class="activity-history-box">
+        <div class="empty-state-text">No transfers yet. Tap 'Send to PC' above to transfer files.</div>
+      </div>
+    </div>
+  </main>
+
+  <!-- TAB 5: GAMING HUD & SAVES -->
   <main id="tab-gaming" class="tab-screen">
-    <div class="hud-card">
-      <div class="hud-header">
-        <div>
-          <span style="font-size: 11px; color: var(--dim); text-transform: uppercase;">🎮 PC Performance HUD</span>
-          <div id="gaming-active-game" class="hud-game-name">Standby (No Game Active)</div>
+    <div class="clean-hero-card" style="background: linear-gradient(135deg, rgba(124, 58, 237, 0.25), rgba(0, 210, 255, 0.15));">
+      <div class="clean-hero-badge" id="gaming-status-badge">STANDBY</div>
+      <div class="clean-hero-title" id="gaming-hud-active-game">No Active PC Game</div>
+      <div class="clean-hero-desc">When a game launches on PC, real-time telemetry and cloud SSD read speed will appear here.</div>
+
+      <div class="clean-stats-row">
+        <div class="clean-stat-box">
+          <div class="clean-stat-val" id="desk-fps">--</div>
+          <div class="clean-stat-lbl">FPS</div>
         </div>
-        <div class="hud-badge" id="hud-mode-pill">COMPANION MODE</div>
-      </div>
-      <div class="hud-grid" style="margin-bottom: 12px;">
-        <div class="hud-metric">
-          <div id="desk-fps" class="hud-metric-val">--</div>
-          <div class="hud-metric-lbl">PC FPS</div>
+        <div class="clean-stat-box">
+          <div class="clean-stat-val" id="desk-ssd">--</div>
+          <div class="clean-stat-lbl">SSD MB/s</div>
         </div>
-        <div class="hud-metric">
-          <div id="desk-ssd" class="hud-metric-val purple">--</div>
-          <div class="hud-metric-lbl">SSD Read MB/s</div>
-        </div>
-        <div class="hud-metric">
-          <div id="desk-hit" class="hud-metric-val green">99.4%</div>
-          <div class="hud-metric-lbl">Hit Rate</div>
+        <div class="clean-stat-box">
+          <div class="clean-stat-val" id="desk-hit">99.4%</div>
+          <div class="clean-stat-lbl">Cache Hit</div>
         </div>
       </div>
-      <div class="hud-grid">
-        <div class="hud-metric">
-          <div id="desk-cpu" class="hud-metric-val">58°C</div>
-          <div class="hud-metric-lbl">CPU Temp</div>
-        </div>
-        <div class="hud-metric">
-          <div id="desk-gpu" class="hud-metric-val purple">64°C</div>
-          <div class="hud-metric-lbl">GPU Temp</div>
-        </div>
-        <div class="hud-metric">
-          <div id="desk-prefetch" class="hud-metric-val green">0</div>
-          <div class="hud-metric-lbl">Prefetching</div>
-        </div>
+    </div>
+
+    <!-- Secondary Hardware Stats -->
+    <div class="clean-stats-row" style="margin-bottom: 20px;">
+      <div class="clean-stat-box">
+        <div class="clean-stat-val" id="desk-cpu">58°C</div>
+        <div class="clean-stat-lbl">CPU Temp</div>
+      </div>
+      <div class="clean-stat-box">
+        <div class="clean-stat-val" id="desk-gpu">64°C</div>
+        <div class="clean-stat-lbl">GPU Temp</div>
+      </div>
+      <div class="clean-stat-box">
+        <div class="clean-stat-val" id="desk-prefetch">0</div>
+        <div class="clean-stat-lbl">Active Chunks</div>
       </div>
     </div>
 
     <!-- Game Saves Manager -->
-    <div class="card">
-      <div class="card-title">
-        <span>Game Save Manager</span>
-        <button class="icon-btn" onclick="loadGameSaves()">🔄</button>
+    <div class="section-container">
+      <div class="section-header">
+        <div class="section-title">Game Saves</div>
+        <div class="section-action" onclick="loadGameSaves()">Refresh</div>
       </div>
-      <div id="game-saves-list" style="display: flex; flex-direction: column; gap: 8px;">
-        <div style="font-size: 12.5px; color: var(--dim);">Loading game saves...</div>
-      </div>
-    </div>
-  </main>
-
-  <!-- SCREEN 4: VAULT (OFFLINE FILES) -->
-  <main id="tab-vault" class="tab-screen">
-    <div class="card highlight">
-      <div class="card-title">
-        <span>💾 Phone Offline Vault</span>
-        <span style="color: var(--ok); font-size: 11px;">100% Offline Ready</span>
-      </div>
-      <p style="font-size: 12px; color: var(--dim); line-height: 1.4; margin-bottom: 10px;">
-        Yeh files aapke phone ke internal storage me saved hain. PC poori tarah band hone par bhi yeh open hongi.
-      </p>
-      <div style="display: flex; justify-content: space-between; font-size: 12px; font-weight: 600;">
-        <span>Vault Storage Used:</span>
-        <span id="vault-used-size" style="color: var(--cyan);">0 MB</span>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">
-        <span>Saved Offline Files</span>
-        <button class="icon-btn" onclick="clearVault()">🗑️ Clear</button>
-      </div>
-      <div id="vault-files-list" style="display: flex; flex-direction: column; gap: 8px;">
-        <div style="font-size: 12.5px; color: var(--dim);">Koi file offline save nahi ki gayi hai. Files tab me kisi bhi file ke 💾 icon par tap karke save karein.</div>
+      <div id="game-saves-list" class="activity-history-box">
+        <div class="empty-state-text">Scanning game saves from PC...</div>
       </div>
     </div>
   </main>
 
-  <!-- SCREEN 5: SETTINGS -->
-  <main id="tab-settings" class="tab-screen">
-    <div class="card">
-      <div class="card-title">Paired PC Details</div>
-      <div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px;">
-        <div style="display: flex; justify-content: space-between;">
-          <span style="color: var(--dim);">PC Name:</span>
-          <span id="settings-pc-name" style="font-weight: 600;">--</span>
-        </div>
-        <div style="display: flex; justify-content: space-between;">
-          <span style="color: var(--dim);">Local IP:</span>
-          <span id="settings-local-ip">--</span>
-        </div>
-        <div style="display: flex; justify-content: space-between;">
-          <span style="color: var(--dim);">Pairing Status:</span>
-          <span id="settings-pair-status" style="color: var(--ok); font-weight: 600;">Paired ✓</span>
-        </div>
-      </div>
-      <button class="btn-secondary" onclick="openPairModal()" style="margin-top: 14px;">Re-Pair or Change PC</button>
-    </div>
+  <!-- Floating Action Button (FAB) -->
+  <button class="material-fab" onclick="triggerFileUpload()" title="Send files to PC">
+    <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+  </button>
 
-    <div class="card">
-      <div class="card-title">PWA App Installation</div>
-      <p style="font-size: 12px; color: var(--dim); line-height: 1.4; margin-bottom: 12px;">
-        Cloud-SSD ko phone ki home screen par normal Android app ki tarah install karein. Zero address bar, instant full screen!
-      </p>
-      <button id="pwa-install-btn" class="btn-primary" onclick="installPwa()">📲 Install on Home Screen</button>
-    </div>
-
-    <div class="card">
-      <div class="card-title">Language / भाषा</div>
-      <div style="display: flex; gap: 10px; margin-top: 8px;">
-        <button class="btn-secondary" style="flex: 1;" onclick="setLanguage('hinglish')">Hinglish</button>
-        <button class="btn-secondary" style="flex: 1;" onclick="setLanguage('hindi')">हिन्दी</button>
-        <button class="btn-secondary" style="flex: 1;" onclick="setLanguage('english')">English</button>
-      </div>
-    </div>
-  </main>
-
-  <!-- Floating Action Button: Upload -->
-  <button class="fab" onclick="triggerFileUpload()" title="Send file to PC">＋</button>
-
-  <!-- Hidden File Input -->
+  <!-- Hidden File Input Controls -->
   <input type="file" id="file-uploader" style="display: none;" onchange="handleFileSelection(event)" multiple>
   <input type="file" id="photo-uploader" accept="image/*,video/*" style="display: none;" onchange="handleFileSelection(event)" multiple capture="environment">
 
-  <!-- Bottom Navigation Bar -->
-  <nav class="bottom-nav">
-    <button class="nav-item active" onclick="switchTab('home')">
-      <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
-      <span>Home</span>
+  <!-- Bottom Navigation Bar (Material 3 / Files by Google Style) -->
+  <nav class="material-bottom-nav">
+    <!-- Clean -->
+    <button class="nav-tab" id="nav-clean" onclick="switchTab('clean')">
+      <div class="nav-icon-indicator">
+        <svg viewBox="0 0 24 24"><path d="M19.36 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM10 17l-3.5-3.5 1.41-1.41L10 14.17l5.59-5.59L17 10l-7 7z"/></svg>
+      </div>
+      <span class="nav-label">Clean</span>
     </button>
-    <button class="nav-item" onclick="switchTab('files')">
-      <svg viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
-      <span>Files</span>
+
+    <!-- Browse (Default Google Files Center Tab) -->
+    <button class="nav-tab active" id="nav-browse" onclick="switchTab('browse')">
+      <div class="nav-icon-indicator">
+        <svg viewBox="0 0 24 24"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/></svg>
+      </div>
+      <span class="nav-label">Browse</span>
     </button>
-    <button class="nav-item" onclick="switchTab('gaming')">
-      <svg viewBox="0 0 24 24"><path d="M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-10 7H8v3H6v-3H3v-2h3V8h2v3h3v2zm4.5 2c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm4-3c-.83 0-1.5-.67-1.5-1.5S18.67 9 19.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
-      <span>Gaming</span>
+
+    <!-- Share (Nearby Share / Offline Wi-Fi Transfer) -->
+    <button class="nav-tab" id="nav-share" onclick="switchTab('share')">
+      <div class="nav-icon-indicator">
+        <svg viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92c0-1.61-1.31-2.92-2.92-2.92z"/></svg>
+      </div>
+      <span class="nav-label">Share</span>
     </button>
-    <button class="nav-item" onclick="switchTab('vault')">
-      <svg viewBox="0 0 24 24"><path d="M18 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-6 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H9V6h6v2z"/></svg>
-      <span>Vault</span>
-    </button>
-    <button class="nav-item" onclick="switchTab('settings')">
-      <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
-      <span>Settings</span>
+
+    <!-- Gaming Companion -->
+    <button class="nav-tab" id="nav-gaming" onclick="switchTab('gaming')">
+      <div class="nav-icon-indicator">
+        <svg viewBox="0 0 24 24"><path d="M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-10 7H8v3H6v-3H3v-2h3V8h2v3h3v2zm4.5 2c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm4-3c-.83 0-1.5-.67-1.5-1.5S18.67 9 19.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
+      </div>
+      <span class="nav-label">Gaming</span>
     </button>
   </nav>
 
-  <!-- Video Stream Player Modal -->
-  <div id="video-modal" class="modal-overlay">
-    <div class="modal-box">
-      <button class="modal-close" onclick="closeVideoModal()">✕</button>
-      <div id="video-modal-title" class="modal-title">Streaming Media</div>
-      <video id="active-video-player" class="stream-player" controls playsinline preload="auto"></video>
+  <!-- Material 3 File Action Bottom Sheet Modal (Authentic Human Polish) -->
+  <div id="file-actions-sheet" class="m3-bottom-sheet-backdrop" onclick="closeFileActionsSheet(event)">
+    <div class="m3-bottom-sheet" onclick="event.stopPropagation()">
+      <div class="m3-drag-handle"></div>
+      
+      <!-- File Header -->
+      <div class="m3-sheet-file-header">
+        <div class="m3-sheet-file-icon" id="sheet-file-icon"></div>
+        <div class="m3-sheet-file-details">
+          <div class="m3-sheet-file-name" id="sheet-file-name">Document.pdf</div>
+          <div class="m3-sheet-file-meta" id="sheet-file-meta">126 KB • Cloud-SSD</div>
+        </div>
+      </div>
+
+      <!-- Quick Action Buttons Strip -->
+      <div class="m3-sheet-actions-grid">
+        <button class="m3-action-item" id="sheet-btn-stream" onclick="sheetActionStream()">
+          <div class="m3-action-icon-circle">
+            <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+          </div>
+          <span>Play</span>
+        </button>
+
+        <button class="m3-action-item" id="sheet-btn-download" onclick="sheetActionDownload()">
+          <div class="m3-action-icon-circle">
+            <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+          </div>
+          <span>Download</span>
+        </button>
+
+        <button class="m3-action-item" id="sheet-btn-star" onclick="sheetActionToggleStar()">
+          <div class="m3-action-icon-circle" id="sheet-star-icon-circle">
+            <svg viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+          </div>
+          <span id="sheet-star-label">Star</span>
+        </button>
+
+        <button class="m3-action-item" id="sheet-btn-vault" onclick="sheetActionSaveVault()">
+          <div class="m3-action-icon-circle">
+            <svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+          </div>
+          <span>Safe folder</span>
+        </button>
+      </div>
+
+      <!-- Secondary Detailed List Options -->
+      <div class="m3-sheet-list">
+        <div class="m3-sheet-row" onclick="sheetActionDownload()">
+          <svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/></svg>
+          <div class="m3-sheet-row-text">
+            <div>Save to Phone Storage</div>
+            <div class="m3-sheet-row-sub">Keep a copy on Android Downloads</div>
+          </div>
+        </div>
+
+        <div class="m3-sheet-row" onclick="sheetActionSaveVault()">
+          <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
+          <div class="m3-sheet-row-text">
+            <div>Move to Safe folder</div>
+            <div class="m3-sheet-row-sub">Protected offline vault</div>
+          </div>
+        </div>
+
+        <div class="m3-sheet-row" onclick="sheetActionShowInfo()">
+          <svg viewBox="0 0 24 24"><path d="M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>
+          <div class="m3-sheet-row-text">
+            <div>File info</div>
+            <div class="m3-sheet-row-sub" id="sheet-file-path-sub">Path on PC</div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
-  <!-- Pairing Modal -->
-  <div id="pair-modal" class="modal-overlay">
-    <div class="modal-box">
-      <button class="modal-close" onclick="closePairModal()">✕</button>
-      <div class="modal-title">Pair with Cloud-SSD PC</div>
-      <p style="font-size: 12px; color: var(--dim); margin-bottom: 12px;">
-        PC Desktop app me "Mobile Hub" tab se Pairing Token enter karein ya QR code scan karein:
-      </p>
-      <input type="text" id="input-token" class="input-field" placeholder="Enter 12-char Pairing Token">
-      <input type="text" id="input-device-name" class="input-field" placeholder="Device Name (e.g. My Phone)">
-      <button class="btn-primary" onclick="submitPairing()">Verify & Connect</button>
+  <!-- Settings / PC Pairing Modal -->
+  <div id="settings-modal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">Settings & Pairing</div>
+        <button class="modal-close-btn" onclick="closeSettingsModal()">
+          <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </div>
+      
+      <div class="settings-group">
+        <div class="settings-row">
+          <span>Connected PC</span>
+          <strong id="modal-pc-name">--</strong>
+        </div>
+        <div class="settings-row">
+          <span>Local IP Address</span>
+          <span id="modal-pc-ip">--</span>
+        </div>
+        <div class="settings-row">
+          <span>Status</span>
+          <span style="color: #6DD58C; font-weight: 500;">Connected</span>
+        </div>
+      </div>
+
+      <div style="margin-top: 16px;">
+        <input type="text" id="manual-server-ip" class="modal-input" placeholder="Custom IP (e.g. 10.180.107.123:8090)">
+        <button class="modal-btn-primary" onclick="saveManualServerIp()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Video Player Modal -->
+  <div id="video-modal" class="modal-backdrop">
+    <div class="modal-card" style="padding: 12px;">
+      <div class="modal-header">
+        <div class="modal-title" id="video-player-filename">Streaming Video</div>
+        <button class="modal-close-btn" onclick="closeVideoModal()">
+          <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </div>
+      <video id="native-video-player" class="video-view" controls playsinline></video>
     </div>
   </div>
 
