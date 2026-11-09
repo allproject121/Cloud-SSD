@@ -397,6 +397,14 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
         {
             await HandlePreviewEndpointAsync(queryParams, stream, ct);
         }
+        else if (path.Equals("/api/storage/offload-config", StringComparison.OrdinalIgnoreCase))
+        {
+            await HandleOffloadConfigEndpointAsync(method, queryParams, headers, stream, ct);
+        }
+        else if (path.Equals("/api/storage/offload-now", StringComparison.OrdinalIgnoreCase))
+        {
+            await HandleOffloadNowEndpointAsync(stream, ct);
+        }
         else
         {
             var notFoundJson = JsonSerializer.Serialize(new { error = "API endpoint not found" }, JsonOpts);
@@ -504,9 +512,21 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
         double downMbps = metrics.DownloadBytesPerSec is { } bps ? Bandwidth.BytesPerSecondToMbps(bps) : 0;
         string? activeGame = _host.CurrentLaunch?.Game.Name;
 
+        var offloadStatus = _host.Offloader.GetStatus();
+
         var status = new
         {
             pcName = Environment.MachineName,
+            storage = new
+            {
+                laptopFreeGb = offloadStatus.LaptopFreeSpaceGB,
+                laptopTotalGb = offloadStatus.LaptopTotalSpaceGB,
+                thresholdGb = offloadStatus.MinFreeSpaceThresholdGB,
+                isUnderThreshold = offloadStatus.IsUnderPressure,
+                autoOffloadEnabled = offloadStatus.Enabled,
+                targetDrive = offloadStatus.TargetDriveName,
+                totalOffloadedFormatted = offloadStatus.TotalBytesOffloadedFormatted
+            },
             os = "Windows 11 / Cloud-SSD Engine",
             version = "0.7.0",
             localIp = LocalIpAddress,
@@ -1274,6 +1294,42 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
         return Array.Empty<byte>();
     }
 
+    private async Task HandleOffloadConfigEndpointAsync(
+        string method,
+        Dictionary<string, string> queryParams,
+        Dictionary<string, string> headers,
+        NetworkStream stream,
+        CancellationToken ct)
+    {
+        if (method == "POST")
+        {
+            if (queryParams.TryGetValue("enabled", out var enabledStr) && bool.TryParse(enabledStr, out var en))
+            {
+                _host.Settings.SmartOffload.Enabled = en;
+            }
+            if (queryParams.TryGetValue("thresholdGb", out var threshStr) && double.TryParse(threshStr, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var th) && th > 0)
+            {
+                _host.Settings.SmartOffload.MinFreeSpaceThresholdGB = Math.Round(th, 1);
+            }
+            if (queryParams.TryGetValue("targetMountId", out var targetId) && !string.IsNullOrWhiteSpace(targetId))
+            {
+                _host.Settings.SmartOffload.TargetMountId = targetId.Trim();
+            }
+            _host.SaveSettings();
+        }
+
+        var status = _host.Offloader.GetStatus();
+        var json = JsonSerializer.Serialize(status, JsonOpts);
+        await SendResponseAsync(stream, 200, "OK", "application/json; charset=utf-8", Encoding.UTF8.GetBytes(json), ct);
+    }
+
+    private async Task HandleOffloadNowEndpointAsync(NetworkStream stream, CancellationToken ct)
+    {
+        var result = await _host.Offloader.RunOffloadAsync(manual: true, ct);
+        var json = JsonSerializer.Serialize(result, JsonOpts);
+        await SendResponseAsync(stream, 200, "OK", "application/json; charset=utf-8", Encoding.UTF8.GetBytes(json), ct);
+    }
+
     private static string GetMimeType(string ext) => ext.ToLowerInvariant() switch
     {
         ".html" or ".htm" => "text/html; charset=utf-8",
@@ -1416,6 +1472,8 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
         sb.Append("Access-Control-Allow-Origin: *\r\n");
         sb.Append("Access-Control-Allow-Methods: GET, POST, OPTIONS, HEAD\r\n");
         sb.Append("Access-Control-Allow-Headers: *\r\n");
+        sb.Append("Cache-Control: no-cache, no-store, must-revalidate\r\n");
+        sb.Append("Pragma: no-cache\r\n");
         sb.Append("Connection: close\r\n\r\n");
 
         byte[] headerBytes = Encoding.UTF8.GetBytes(sb.ToString());

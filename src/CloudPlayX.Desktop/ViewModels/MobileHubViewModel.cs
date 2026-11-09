@@ -35,6 +35,7 @@ public sealed partial class MobileHubViewModel : PageViewModel
 
         RefreshState();
         LoadTransferHistory();
+        Host.Offloader.OffloadCompleted += _ => Ui(RefreshState);
     }
 
     [ObservableProperty] private bool _isRunning;
@@ -57,6 +58,7 @@ public sealed partial class MobileHubViewModel : PageViewModel
     [ObservableProperty] private string _selectedFilter = "All";
     [ObservableProperty] private string _transferSearchText = "";
     [ObservableProperty] private int _totalTransferCount;
+    [ObservableProperty] private string _storageSaverSummary = "Storage Saver: Active";
 
 
     public ObservableCollection<PairedDeviceItem> PairedDevices { get; } = new();
@@ -96,6 +98,9 @@ public sealed partial class MobileHubViewModel : PageViewModel
         {
             QrCode = null;
         }
+
+        var off = Host.Offloader.GetStatus();
+        StorageSaverSummary = $"Laptop: {off.LaptopFreeSpaceGB} GB free • Threshold: {off.MinFreeSpaceThresholdGB} GB (Auto-shift to {off.TargetDriveLetter}:)";
 
         PairedDevices.Clear();
         foreach (var d in Host.Settings.MobileBridge.PairedDevices)
@@ -229,6 +234,15 @@ public sealed partial class MobileHubViewModel : PageViewModel
         Host.SaveSettings();
         RefreshState();
         Say($"Device '{item.Name}' removed.", "ok");
+    }
+
+    [RelayCommand]
+    private async Task OffloadToCloudNowAsync()
+    {
+        Say("Starting Smart Storage Offload to Cloud Drive…", "info");
+        var res = await Host.Offloader.RunOffloadAsync(manual: true);
+        Say(res.Message, res.Success ? "ok" : "warn");
+        RefreshState();
     }
 
     partial void OnSelectedFilterChanged(string value) => ApplyTransferFilter();

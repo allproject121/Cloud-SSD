@@ -123,15 +123,17 @@
                     <!-- Live Transfer Activity & Full History Panel -->
                     <Border Style="{StaticResource Card}">
                         <StackPanel>
-                            <DockPanel Margin="0,0,0,10">
+                            <DockPanel Margin="0,0,0,4">
                                 <TextBlock DockPanel.Dock="Right" Text="{Binding TransferRateFormatted}" FontWeight="Bold"
                                            FontSize="13" Foreground="{StaticResource Accent}" />
                                 <TextBlock Text="LIVE ACTIVITY &amp; TRANSFER HISTORY" Style="{StaticResource Label}" VerticalAlignment="Center" />
                             </DockPanel>
+                            <TextBlock Text="{Binding StorageSaverSummary}" FontSize="11" Foreground="{StaticResource Dim}" Margin="0,0,0,8" />
 
                             <!-- Action Bar: Count, Open Folder, Clear -->
                             <DockPanel Margin="0,0,0,8" LastChildFill="True">
                                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                    <Button Content="⚡ Offload to Cloud (Z:)" Command="{Binding OffloadToCloudNowCommand}" Style="{StaticResource Primary}" Padding="8,3" FontSize="11" Margin="0,0,6,0" ToolTip="Offload local files to Cloud Drive (Z:) immediately" />
                                     <Button Content="Uploads Folder" Command="{Binding OpenUploadsFolderCommand}" Padding="8,3" FontSize="11" Margin="0,0,6,0" />
                                     <Button Content="Clear History" Command="{Binding ClearTransferHistoryCommand}" Padding="8,3" FontSize="11" />
                                 </StackPanel>

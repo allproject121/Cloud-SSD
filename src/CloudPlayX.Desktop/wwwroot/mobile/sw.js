@@ -1,5 +1,5 @@
 // Cloud-SSD Mobile Bridge Service Worker (100% Offline Capability)
-const CACHE_NAME = 'cloudssd-mobile-v1';
+const CACHE_NAME = 'cloudssd-mobile-v2';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

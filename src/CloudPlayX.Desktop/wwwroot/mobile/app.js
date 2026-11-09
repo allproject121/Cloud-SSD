@@ -407,6 +407,22 @@
           drivesBadge.textContent = `${data.drivesCount} Drives Online`;
         }
 
+        // Laptop Storage Saver status
+        if (data.storage) {
+          const lFree = document.getElementById('laptop-free-pill');
+          const lThresh = document.getElementById('laptop-threshold-pill');
+          const lSub = document.getElementById('laptop-storage-sub');
+          const lPill = document.getElementById('laptop-status-pill');
+          if (lFree) lFree.textContent = `${data.storage.laptopFreeGb} GB Free`;
+          if (lThresh) lThresh.textContent = `Limit: ${data.storage.thresholdGb} GB`;
+          if (lSub) lSub.textContent = `Auto-tiering to ${data.storage.targetDrive || 'Cloud-SSD (Z:)'}`;
+          if (lPill) {
+            lPill.textContent = data.storage.isUnderThreshold ? 'Low Space' : (data.storage.autoOffloadEnabled ? 'Active' : 'Off');
+            lPill.className = data.storage.isUnderThreshold ? 'pc-conn-pill' : 'pc-conn-pill ping';
+            if (data.storage.isUnderThreshold) lPill.style.color = '#F59E0B';
+          }
+        }
+
         // Active Game Banner
         const gameBanner = document.getElementById('home-game-banner');
         if (gameBanner) {
@@ -423,6 +439,27 @@
       }
     } catch (e) { }
   }
+
+  window.triggerLaptopOffloadNow = async function(e) {
+    if (e) e.stopPropagation();
+    showToast('Starting Smart Offload to Cloud Drive…');
+    try {
+      const res = await fetch(apiUrl('/api/storage/offload-now'), {
+        method: 'POST',
+        headers: getAuthHeaders()
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(data.message || `Offloaded ${data.filesMovedCount} files (${data.bytesFreedFormatted}) to Cloud Drive!`);
+        fetchTransferHistory(true);
+        updatePcStatusMetrics();
+      } else {
+        showToast(`Offload notice: ${data.message}`);
+      }
+    } catch (err) {
+      showToast(`Cannot reach PC: ${err.message}`);
+    }
+  };
 
   // -------------------------------------------------------------
   // TAB 2: BROWSER (Phone Folder & Real Phone Storage)

@@ -25,6 +25,7 @@ public sealed partial class SmartCacheViewModel : PageViewModel
     public ObservableCollection<string> Warnings { get; } = new();
     public ObservableCollection<KeyValueRow> Usage { get; } = new();
     public int[] Presets { get; } = [10, 20, 30, 40];
+    public int[] OffloadPresets { get; } = [10, 15, 20, 30];
 
     [ObservableProperty] private string _budgetGb = "20";
     [ObservableProperty] private string _reserveGb = "8";
@@ -34,6 +35,20 @@ public sealed partial class SmartCacheViewModel : PageViewModel
     [ObservableProperty] private string _effective = "";
     [ObservableProperty] private CachedFileRow? _selectedFile;
 
+    [ObservableProperty] private bool _autoOffloadEnabled = true;
+    [ObservableProperty] private string _offloadThresholdGb = "15";
+    [ObservableProperty] private string _laptopFreeGb = "-- GB";
+    [ObservableProperty] private string _laptopTotalGb = "-- GB";
+    [ObservableProperty] private string _laptopDiskSummary = "Checking storage...";
+    [ObservableProperty] private double _laptopDiskPercent = 0;
+    [ObservableProperty] private bool _isUnderThreshold;
+    [ObservableProperty] private string _offloadStatusText = "Monitoring Active";
+    [ObservableProperty] private string _offloadStatusTone = "ok";
+    [ObservableProperty] private string _targetDriveDisplayName = "Cloud-SSD (15TB) (Z:)";
+    [ObservableProperty] private string _lastOffloadFormatted = "Never";
+    [ObservableProperty] private string _totalOffloadedFormatted = "0 B";
+    [ObservableProperty] private string _uploadsPendingSummary = "0 files (0 B)";
+
     public override void OnShown()
     {
         var c = Host.Settings.Cache;
@@ -42,6 +57,7 @@ public sealed partial class SmartCacheViewModel : PageViewModel
         MaxAgeDays = c.MaxAge.TotalDays.ToString("0", CultureInfo.InvariantCulture);
         CacheRoot = Host.Paths.CacheRootFor(Host.Settings);
         Pinned.ReplaceWith(c.PinnedPaths);
+        RefreshOffloadStatus();
         _ = RefreshAsync();
     }
 
@@ -184,6 +200,52 @@ public sealed partial class SmartCacheViewModel : PageViewModel
     {
         Host.Pins.Touch();
         Say($"Touched {Host.Pins.LastTouched} pinned file(s).", "ok");
+    }
+
+    public void RefreshOffloadStatus()
+    {
+        var s = Host.Offloader.GetStatus();
+        AutoOffloadEnabled = s.Enabled;
+        OffloadThresholdGb = s.MinFreeSpaceThresholdGB.ToString("0.#", CultureInfo.InvariantCulture);
+        LaptopFreeGb = $"{s.LaptopFreeSpaceGB} GB";
+        LaptopTotalGb = $"{s.LaptopTotalSpaceGB} GB";
+        LaptopDiskPercent = s.LaptopUsedPercentage;
+        LaptopDiskSummary = $"{s.LaptopFreeSpaceGB} GB free of {s.LaptopTotalSpaceGB} GB ({s.LaptopUsedPercentage}% used)";
+        IsUnderThreshold = s.IsUnderPressure;
+        OffloadStatusText = s.IsUnderPressure 
+            ? $"⚠️ Low Storage Alert: Free space below {s.MinFreeSpaceThresholdGB} GB limit!" 
+            : $"✓ Storage Safe: {s.LaptopFreeSpaceGB} GB free (Threshold: {s.MinFreeSpaceThresholdGB} GB)";
+        OffloadStatusTone = s.IsUnderPressure ? "warn" : "ok";
+        TargetDriveDisplayName = s.TargetDriveName;
+        LastOffloadFormatted = s.LastOffloadTime.HasValue ? s.LastOffloadTime.Value.ToLocalTime().ToString("MMM dd, HH:mm") : "None yet";
+        TotalOffloadedFormatted = s.TotalBytesOffloadedFormatted;
+        UploadsPendingSummary = $"{s.UploadsFolderFileCount} file(s) ({s.UploadsFolderSizeFormatted}) in Uploads folder";
+    }
+
+    [RelayCommand] private void PresetOffload(int gb) => OffloadThresholdGb = gb.ToString(CultureInfo.InvariantCulture);
+
+    [RelayCommand]
+    private async Task OffloadNowAsync()
+    {
+        Say("Starting Smart Offload to Cloud Drive…", "info");
+        var res = await Host.Offloader.RunOffloadAsync(manual: true);
+        Say(res.Message, res.Success ? "ok" : "warn");
+        RefreshOffloadStatus();
+    }
+
+    [RelayCommand]
+    private void SaveOffloadSettings()
+    {
+        if (!double.TryParse(OffloadThresholdGb, NumberStyles.Float, CultureInfo.InvariantCulture, out var th) || th < 1)
+        {
+            Say("Enter a valid threshold limit of at least 1 GB.", "error");
+            return;
+        }
+        Host.Settings.SmartOffload.Enabled = AutoOffloadEnabled;
+        Host.Settings.SmartOffload.MinFreeSpaceThresholdGB = Math.Round(th, 1);
+        Host.SaveSettings();
+        Say($"Saved. When laptop free space drops below {th:0.#} GB, files will auto-shift to Cloud Drive.", "ok");
+        RefreshOffloadStatus();
     }
 }
 

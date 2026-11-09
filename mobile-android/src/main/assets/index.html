@@ -3,18 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Cloud Drive</title>
+  <title>Cloud-SSD</title>
   
   <!-- PWA Meta Tags -->
   <meta name="theme-color" content="#0F1117">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="description" content="Cloud Drive companion and ultra high-speed mobile bridge">
+  <meta name="description" content="Cloud-SSD companion and ultra high-speed mobile bridge">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/svg+xml" href="icon-192.svg">
   <link rel="apple-touch-icon" href="icon-192.svg">
   
-  <link rel="stylesheet" href="app.css">
+  <link rel="stylesheet" href="app.css?v=0.7.2">
 </head>
 <body>
 
@@ -24,7 +24,7 @@
       <div class="search-icon">
         <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
       </div>
-      <input type="text" id="global-search-input" placeholder="Search Cloud Drive & Phone..." oninput="handleSearch(this.value)" autocomplete="off">
+      <input type="text" id="global-search-input" placeholder="Search Cloud-SSD & Phone..." oninput="handleSearch(this.value)" autocomplete="off">
       <div id="clear-search-btn" class="clear-search" onclick="clearSearch()" style="display: none;">
         <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
       </div>
@@ -163,6 +163,31 @@
       </div>
     </div>
 
+    <!-- Laptop Smart Storage Saver Card -->
+    <div class="section-container" id="laptop-storage-saver-card">
+      <div class="pc-connection-banner-card" style="border: 1px solid rgba(168, 199, 250, 0.25); background: rgba(22, 27, 34, 0.9);">
+        <div class="pc-conn-left">
+          <div class="pc-conn-icon-halo" style="background: rgba(168, 199, 250, 0.12); color: #A8C7FA;">
+            <svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13h-3v4h-2v-4H6l5-5 5 5h-2z"/></svg>
+          </div>
+          <div class="pc-conn-info">
+            <div class="pc-conn-title">Laptop Storage Saver</div>
+            <div class="pc-conn-sub" id="laptop-storage-sub">Auto-shifts local files to Cloud Drive (Z:) when space is low</div>
+            <div class="pc-conn-pills-row">
+              <span class="pc-conn-pill speed" id="laptop-free-pill">-- GB Free</span>
+              <span class="pc-conn-pill" id="laptop-threshold-pill">Limit: 15 GB</span>
+              <span class="pc-conn-pill ping" id="laptop-status-pill">Active</span>
+            </div>
+          </div>
+        </div>
+        <div class="pc-conn-actions">
+          <button class="pc-conn-toggle-btn" style="background: #0078D4; color: white; padding: 7px 12px; font-size: 12px; border-radius: 8px; border: none; font-weight: 600;" onclick="triggerLaptopOffloadNow(event)">
+            Offload Now
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Quick Action Shortcut Chips -->
     <div class="section-container">
       <div class="quick-action-strip">
@@ -211,7 +236,7 @@
       </div>
       <div class="perm-card-body">
         <div class="perm-card-title">Enable Phone Storage Access</div>
-        <div class="perm-card-sub">Allow Cloud Drive to show all live photos, videos, and downloaded files on this phone.</div>
+        <div class="perm-card-sub">Allow Cloud-SSD to show all live photos, videos, and downloaded files on this phone.</div>
         <button class="perm-grant-btn" onclick="requestPhonePermissions()">Grant Permission</button>
       </div>
     </div>
@@ -553,7 +578,7 @@
         </div>
         <div class="conn-modal-header-info">
           <div class="conn-modal-title" id="modal-pc-name">ROSHAN</div>
-          <div class="conn-modal-sub" id="modal-pc-os">Windows 11 • Cloud Drive Engine</div>
+          <div class="conn-modal-sub" id="modal-pc-os">Windows 11 • Cloud-SSD Engine</div>
           <div class="conn-status-tag connected" id="modal-status-tag">Connected & Synced</div>
         </div>
         <button class="conn-modal-close" onclick="closeConnectionModal()">
@@ -695,7 +720,7 @@
           <svg viewBox="0 0 24 24"><path d="M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>
           <div class="m3-sheet-row-text">
             <div>File info & Details</div>
-            <div class="m3-sheet-row-sub" id="sheet-file-path-sub">Path on Cloud Drive</div>
+            <div class="m3-sheet-row-sub" id="sheet-file-path-sub">Path on Cloud-SSD</div>
           </div>
         </div>
       </div>
@@ -787,6 +812,6 @@
   <!-- Toast Notification -->
   <div id="toast" class="toast">Connected</div>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=0.7.2"></script>
 </body>
 </html>

@@ -250,6 +250,12 @@ public sealed class AppHost : IAsyncDisposable
             _diskPressure = pressure != Cache.DiskPressure.Normal;
             if (_diskPressure && !was) _log.LogWarning("Disk space low ({Free} free, reserve {Reserve}); prefetching paused", ByteSize.Format(free), ByteSize.Format(Settings.Cache.MinFreeSpaceBytes));
             if (!_diskPressure && was) _log.LogInformation("Disk space recovered; prefetching resumed");
+
+            // Smart Storage Saver check
+            if (Settings.SmartOffload.Enabled)
+            {
+                _ = Offloader.CheckAndOffloadIfNeededAsync();
+            }
         }
         catch (Exception) { }
     }

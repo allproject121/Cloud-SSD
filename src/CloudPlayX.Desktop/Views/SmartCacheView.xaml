@@ -3,6 +3,68 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="0,0,14,20">
+            <!-- Smart Storage Saver & Auto Cloud Offload Card -->
+            <Border Style="{StaticResource Card}" Margin="0,0,0,14" BorderBrush="{StaticResource Accent}" BorderThickness="1.5">
+                <StackPanel>
+                    <DockPanel Margin="0,0,0,10">
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                            <Button Content="⚡ Offload to Cloud Drive Now" Style="{StaticResource Primary}"
+                                    Command="{Binding OffloadNowCommand}" Padding="14,6" Margin="0,0,8,0" />
+                            <Button Content="Save Settings" Command="{Binding SaveOffloadSettingsCommand}" Padding="12,6" />
+                        </StackPanel>
+                        <StackPanel>
+                            <TextBlock Text="⚡ SMART STORAGE SAVER &amp; AUTO CLOUD OFFLOAD" Style="{StaticResource H2}" Foreground="{StaticResource Accent}" />
+                            <TextBlock Text="When laptop storage drops below your limit, local files automatically switch to Cloud Drive (Z:)." Style="{StaticResource Caption}" />
+                        </StackPanel>
+                    </DockPanel>
+
+                    <!-- Status Banner -->
+                    <Border Background="{StaticResource Surface2}" CornerRadius="8" Padding="14,10" Margin="0,0,0,12" BorderBrush="{Binding OffloadStatusTone, Converter={StaticResource Tone}}" BorderThickness="1">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="{Binding OffloadStatusText}" FontWeight="Bold" FontSize="13" Foreground="{Binding OffloadStatusTone, Converter={StaticResource Tone}}" />
+                                <TextBlock Text="{Binding LaptopDiskSummary}" FontSize="12" Foreground="{StaticResource Muted}" Margin="0,3,0,0" />
+                                <ProgressBar Height="6" Maximum="100" Value="{Binding LaptopDiskPercent}" Margin="0,6,0,0" Foreground="{StaticResource Accent}" Background="{StaticResource Bg}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="20,0,0,0">
+                                <TextBlock Text="{Binding TargetDriveDisplayName}" FontWeight="SemiBold" FontSize="12" HorizontalAlignment="Right" Foreground="{StaticResource Purple}" />
+                                <TextBlock Text="{Binding UploadsPendingSummary}" FontSize="11" Foreground="{StaticResource Dim}" HorizontalAlignment="Right" Margin="0,2,0,0" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- Controls Row -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        
+                        <CheckBox IsChecked="{Binding AutoOffloadEnabled}" Content="Enable Auto Cloud Switch on Low Storage"
+                                  VerticalAlignment="Center" FontWeight="SemiBold" FontSize="13" />
+
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                            <TextBlock Text="Trigger when laptop free space is below:" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="{StaticResource Dim}" />
+                            <TextBox Text="{Binding OffloadThresholdGb, UpdateSourceTrigger=PropertyChanged}" Width="60" VerticalAlignment="Center" Margin="0,0,8,0" />
+                            <TextBlock Text="GB" VerticalAlignment="Center" Margin="0,0,12,0" FontWeight="SemiBold" />
+                            
+                            <ItemsControl ItemsSource="{Binding OffloadPresets}" VerticalAlignment="Center">
+                                <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Content="{Binding StringFormat={}{0} GB}" Padding="8,4" Margin="0,0,4,0"
+                                                Command="{Binding DataContext.PresetOffloadCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="1.2*" />

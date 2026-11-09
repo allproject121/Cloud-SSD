@@ -173,3 +173,16 @@ Poore project aur compiled binary files ki gehri jaanch ki gayi:
   4. **GitHub Releases Deployment**:
      - Synced Cloud-SSD-0.7.0-setup.exe, Cloud-SSD-Mobile.apk, and CloudDrive.apk into eleases/.
      - Pushed all commits to https://github.com/allproject121/Cloud-Drive.git.
+
+### [Step 3.20] - 2026-11-09 20:10:00 IST
+- **Task**: Smart Storage Saver Desktop UI Integration & Fresh Release Build
+- **Status**: COMPLETED
+- **Detailed Key Changes**:
+  1. **Smart Storage Saver Card in Desktop UI (SmartCacheView.xaml)**:
+     - Added dedicated card with "? Offload to Cloud Drive Now" action button.
+     - Live disk pressure indicators, progress bar, and target drive display (Cloud-SSD (15TB) (Z:)).
+     - Auto Cloud Switch threshold selector and quick presets (10, 20, 30, 50 GB) wired to ConfigViewModels.cs.
+  2. **Fresh Windows Setup Installer (Inno Setup 6)**:
+     - Recompiled Cloud-SSD-0.7.0-setup.exe (68.7 MB, SHA256: 8d6dfa3d7c54dff9db5efbd38c74bda914971f5b275dd9917438aa9b796fa980).
+  3. **GitHub Push**:
+     - Synced updated binaries to eleases/ and pushed to https://github.com/allproject121/Cloud-Drive.git.
