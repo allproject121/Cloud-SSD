@@ -1,0 +1,179 @@
+<UserControl x:Class="CloudPlayX.Desktop.Views.MobileHubView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="0,0,14,24">
+
+            <!-- Top Banner Card -->
+            <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                <DockPanel LastChildFill="True">
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Border CornerRadius="12" Padding="10,4" Margin="0,0,10,0"
+                                Background="{StaticResource Surface2}"
+                                BorderBrush="{Binding StatusTone, Converter={StaticResource Tone}}" BorderThickness="1">
+                            <StackPanel Orientation="Horizontal">
+                                <Ellipse Width="8" Height="8" Margin="0,0,6,0"
+                                         Fill="{Binding StatusTone, Converter={StaticResource Tone}}" />
+                                <TextBlock Text="{Binding StatusText}" FontSize="12" FontWeight="SemiBold"
+                                           Foreground="{Binding StatusTone, Converter={StaticResource Tone}}" />
+                            </StackPanel>
+                        </Border>
+                        <Button Content="Start Bridge" Command="{Binding ToggleServerCommand}" Padding="12,6"
+                                Visibility="{Binding IsRunning, Converter={StaticResource Vis}, ConverterParameter=invert}"
+                                Style="{StaticResource Primary}" />
+                        <Button Content="Stop Bridge" Command="{Binding ToggleServerCommand}" Padding="12,6"
+                                Visibility="{Binding IsRunning, Converter={StaticResource Vis}}"
+                                Style="{StaticResource DangerButton}" />
+                    </StackPanel>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Mobile Hub (Offline Phone Bridge)" Style="{StaticResource H2}" Margin="0,0,0,4" />
+                        <TextBlock Text="Connect your Android phone over zero-data local Wi-Fi or hotspot for fast 4K streaming, file drop and game saves."
+                                   Style="{StaticResource Caption}" />
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+
+            <!-- 2-Column Grid -->
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="1.15*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Left Column: QR Code & Connection -->
+                <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <DockPanel Margin="0,0,0,12">
+                                <Button DockPanel.Dock="Right" Content="New Token" Command="{Binding RegenerateTokenCommand}" Padding="8,4" FontSize="11" />
+                                <TextBlock Text="SCAN QR CODE WITH PHONE" Style="{StaticResource Label}" VerticalAlignment="Center" />
+                            </DockPanel>
+
+                            <!-- QR Code Box -->
+                            <Border Width="220" Height="220" Background="White" CornerRadius="12" HorizontalAlignment="Center"
+                                    Padding="10" Margin="0,0,0,14" BorderBrush="{StaticResource Accent}" BorderThickness="1">
+                                <Image Source="{Binding QrCode}" RenderOptions.BitmapScalingMode="NearestNeighbor" />
+                            </Border>
+
+                            <TextBlock Text="LOCAL ACCESS ADDRESS" Style="{StaticResource Label}" Margin="0,0,0,4" />
+                            <TextBox Text="{Binding PairingUrl, Mode=OneWay}" IsReadOnly="True" Margin="0,0,0,10"
+                                     FontFamily="Consolas" FontSize="11.5" />
+
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,14">
+                                <Button Content="Copy Link" Command="{Binding CopyUrlCommand}" Padding="12,5" Margin="0,0,8,0" />
+                                <Button Content="Open in Browser" Command="{Binding OpenInBrowserCommand}" Padding="12,5" />
+                            </StackPanel>
+
+                            <!-- Hotspot Tip Box -->
+                            <Border Background="{StaticResource Surface2}" CornerRadius="8" Padding="12,10" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                                <StackPanel>
+                                    <TextBlock Text="💡 NO WI-FI ROUTER / BROADBAND?" FontWeight="SemiBold" FontSize="11.5" Foreground="{StaticResource Accent}" Margin="0,0,0,4" />
+                                    <TextBlock Text="Turn on your phone's Wi-Fi Hotspot and connect your PC to it. Mobile Internet Data ON karne ki bilkul zaroorat nahi hai. Local Wi-Fi transfer speed 50-100 MB/s milegi!"
+                                               TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource Dim}" LineHeight="16" />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- Right Column: Paired Devices & Activity -->
+                <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                    <!-- Paired Devices Card -->
+                    <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                        <StackPanel>
+                            <DockPanel Margin="0,0,0,10">
+                                <Button DockPanel.Dock="Right" Content="Revoke All" Command="{Binding RevokeAllCommand}" Padding="8,3" FontSize="11" />
+                                <TextBlock Text="PAIRED DEVICES" Style="{StaticResource Label}" VerticalAlignment="Center" />
+                            </DockPanel>
+
+                            <ItemsControl ItemsSource="{Binding PairedDevices}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Background="{StaticResource Surface2}" CornerRadius="8" Padding="10" Margin="0,0,0,6"
+                                                BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                                            <DockPanel LastChildFill="True">
+                                                <Button DockPanel.Dock="Right" Content="Disconnect" Command="{Binding DisconnectCommand}"
+                                                        Padding="8,4" FontSize="11" VerticalAlignment="Center" />
+                                                <StackPanel VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13" />
+                                                    <TextBlock FontSize="11" Foreground="{StaticResource Dim}">
+                                                        <Run Text="IP: " /><Run Text="{Binding IpAddress}" />
+                                                        <Run Text=" · Last seen: " /><Run Text="{Binding LastSeenFormatted}" />
+                                                    </TextBlock>
+                                                </StackPanel>
+                                            </DockPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <TextBlock Text="No phones paired yet. Scan QR code above to connect."
+                                       Style="{StaticResource Caption}" Margin="0,4,0,0"
+                                       Visibility="{Binding PairedDevices.Count, Converter={StaticResource Vis}, ConverterParameter=invert}" />
+
+                            <!-- Access Permissions -->
+                            <TextBlock Text="ACCESS PERMISSIONS" Style="{StaticResource Label}" Margin="0,16,0,8" />
+                            <CheckBox Content="Allow Browsing Cloud-SSD Virtual Drives" IsChecked="{Binding AllowDriveBrowsing}" Margin="0,0,0,6" />
+                            <CheckBox Content="Allow Media Streaming (4K Video &amp; Music)" IsChecked="{Binding AllowStreaming}" Margin="0,0,0,6" />
+                            <CheckBox Content="Allow Mobile-to-PC File Uploads" IsChecked="{Binding AllowUploads}" Margin="0,0,0,6" />
+                            <CheckBox Content="Enable Live Gaming HUD on Phone Screen" IsChecked="{Binding AllowGamingHud}" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Live Activity Meter -->
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <DockPanel Margin="0,0,0,8">
+                                <TextBlock DockPanel.Dock="Right" Text="{Binding TransferRateFormatted}" FontWeight="Bold"
+                                           FontSize="13" Foreground="{StaticResource Accent}" />
+                                <TextBlock Text="LIVE TRANSFER ACTIVITY" Style="{StaticResource Label}" />
+                            </DockPanel>
+
+                            <ItemsControl ItemsSource="{Binding RecentTransfers}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding}" FontSize="11" Foreground="{StaticResource Dim}" Margin="0,2" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <TextBlock Text="No active streaming or file transfers right now."
+                                       Style="{StaticResource Caption}" Margin="0,4,0,0"
+                                       Visibility="{Binding RecentTransfers.Count, Converter={StaticResource Vis}, ConverterParameter=invert}" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Grid>
+
+            <!-- Quick Drop Zone -->
+            <Border Style="{StaticResource Card}" Margin="0,14,0,14" BorderBrush="{StaticResource Purple}" BorderThickness="1"
+                    AllowDrop="True" Drop="OnDropZoneDrop">
+                <StackPanel Margin="10,12" HorizontalAlignment="Center">
+                    <TextBlock Text="📁 PC TO PHONE QUICK DROP ZONE" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" Foreground="{StaticResource Purple}" />
+                    <TextBlock Text="Drag and drop files, ROMs, or videos here to push them to your connected phone over local Wi-Fi at 50-100 MB/s."
+                               Style="{StaticResource Caption}" HorizontalAlignment="Center" Margin="0,4,0,0" />
+                </StackPanel>
+            </Border>
+
+            <!-- Folder Sync Configuration -->
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <TextBlock Text="FOLDER CONFIGURATION FOR PHONE SYNC" Style="{StaticResource H2}" Margin="0,0,0,12" />
+
+                    <TextBlock Text="PHONE UPLOAD DESTINATION DIRECTORY" Style="{StaticResource Label}" />
+                    <DockPanel Margin="0,0,0,12">
+                        <Button DockPanel.Dock="Right" Content="Browse…" Command="{Binding BrowseUploadsCommand}" Margin="8,0,0,0" />
+                        <TextBox Text="{Binding UploadDirectory, UpdateSourceTrigger=PropertyChanged}" />
+                    </DockPanel>
+
+                    <TextBlock Text="PHONE PHOTOS AUTO-BACKUP DIRECTORY" Style="{StaticResource Label}" />
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Content="Browse…" Command="{Binding BrowsePhotosCommand}" Margin="8,0,0,0" />
+                        <TextBox Text="{Binding PhotosBackupDirectory, UpdateSourceTrigger=PropertyChanged}" />
+                    </DockPanel>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
