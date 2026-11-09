@@ -31,6 +31,7 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.File;
@@ -418,6 +419,206 @@ public class MainActivity extends Activity {
                     }
                 }
             });
+        }
+
+        @JavascriptInterface
+        public void requestAllPermissions() {
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    if (Build.VERSION.SDK_INT >= 33) {
+                        requestPermissions(new String[]{
+                            "android.permission.READ_MEDIA_IMAGES",
+                            "android.permission.READ_MEDIA_VIDEO",
+                            "android.permission.READ_MEDIA_AUDIO",
+                            "android.permission.POST_NOTIFICATIONS"
+                        }, 101);
+                    } else if (Build.VERSION.SDK_INT >= 23) {
+                        requestPermissions(new String[]{
+                            "android.permission.READ_EXTERNAL_STORAGE",
+                            "android.permission.WRITE_EXTERNAL_STORAGE"
+                        }, 101);
+                    }
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public boolean hasStoragePermission() {
+            if (Build.VERSION.SDK_INT >= 33) {
+                return checkSelfPermission("android.permission.READ_MEDIA_IMAGES") == PackageManager.PERMISSION_GRANTED;
+            } else if (Build.VERSION.SDK_INT >= 23) {
+                return checkSelfPermission("android.permission.READ_EXTERNAL_STORAGE") == PackageManager.PERMISSION_GRANTED;
+            }
+            return true;
+        }
+
+        @JavascriptInterface
+        public String getPhoneCategoryStats() {
+            JSONObject obj = new JSONObject();
+            try {
+                // Images
+                long imgBytes = 0; int imgCount = 0;
+                Uri imgUri = MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
+                String[] proj = { MediaStore.MediaColumns.SIZE };
+                try (Cursor c = getContentResolver().query(imgUri, proj, null, null, null)) {
+                    if (c != null) {
+                        imgCount = c.getCount();
+                        int szIdx = c.getColumnIndex(MediaStore.MediaColumns.SIZE);
+                        while (c.moveToNext()) {
+                            if (szIdx >= 0) imgBytes += c.getLong(szIdx);
+                        }
+                    }
+                }
+                obj.put("imagesCount", imgCount);
+                obj.put("imagesBytes", imgBytes);
+
+                // Videos
+                long vidBytes = 0; int vidCount = 0;
+                Uri vidUri = MediaStore.Video.Media.EXTERNAL_CONTENT_URI;
+                try (Cursor c = getContentResolver().query(vidUri, proj, null, null, null)) {
+                    if (c != null) {
+                        vidCount = c.getCount();
+                        int szIdx = c.getColumnIndex(MediaStore.MediaColumns.SIZE);
+                        while (c.moveToNext()) {
+                            if (szIdx >= 0) vidBytes += c.getLong(szIdx);
+                        }
+                    }
+                }
+                obj.put("videosCount", vidCount);
+                obj.put("videosBytes", vidBytes);
+
+                // Audio
+                long audBytes = 0; int audCount = 0;
+                Uri audUri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI;
+                try (Cursor c = getContentResolver().query(audUri, proj, null, null, null)) {
+                    if (c != null) {
+                        audCount = c.getCount();
+                        int szIdx = c.getColumnIndex(MediaStore.MediaColumns.SIZE);
+                        while (c.moveToNext()) {
+                            if (szIdx >= 0) audBytes += c.getLong(szIdx);
+                        }
+                    }
+                }
+                obj.put("audioCount", audCount);
+                obj.put("audioBytes", audBytes);
+
+                // Downloads folder
+                long dlBytes = 0; int dlCount = 0;
+                File dlDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+                if (dlDir != null && dlDir.exists()) {
+                    File[] dlFiles = dlDir.listFiles();
+                    if (dlFiles != null) {
+                        for (File f : dlFiles) {
+                            if (f.isFile() && !f.getName().startsWith(".")) {
+                                dlCount++;
+                                dlBytes += f.length();
+                            }
+                        }
+                    }
+                }
+                obj.put("downloadsCount", dlCount);
+                obj.put("downloadsBytes", dlBytes);
+            } catch (Exception ignored) { }
+            return obj.toString();
+        }
+
+        @JavascriptInterface
+        public String getPhoneDownloadsList() {
+            JSONArray arr = new JSONArray();
+            try {
+                File dlDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+                if (dlDir != null && dlDir.exists()) {
+                    File[] files = dlDir.listFiles();
+                    if (files != null) {
+                        java.util.Arrays.sort(files, new java.util.Comparator<File>() {
+                            @Override
+                            public int compare(File a, File b) {
+                                return Long.compare(b.lastModified(), a.lastModified());
+                            }
+                        });
+                        int limit = Math.min(files.length, 60);
+                        for (int i = 0; i < limit; i++) {
+                            File f = files[i];
+                            if (f.isFile() && !f.getName().startsWith(".")) {
+                                JSONObject item = new JSONObject();
+                                item.put("name", f.getName());
+                                item.put("path", f.getAbsolutePath());
+                                item.put("size", f.length());
+                                item.put("modified", f.lastModified());
+                                item.put("isLocal", true);
+                                arr.put(item);
+                            }
+                        }
+                    }
+                }
+            } catch (Exception ignored) { }
+            return arr.toString();
+        }
+
+        @JavascriptInterface
+        public void openLocalFile(final String path) {
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        File f = new File(path);
+                        if (!f.exists()) {
+                            Toast.makeText(MainActivity.this, "File not found: " + path, Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        String mime = URLConnection.guessContentTypeFromName(f.getName());
+                        if (mime == null) mime = "*/*";
+                        Intent intent = new Intent(Intent.ACTION_VIEW);
+                        Uri uri;
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                            // Use direct file intent with grant or content URI
+                            uri = Uri.fromFile(f);
+                        } else {
+                            uri = Uri.fromFile(f);
+                        }
+                        intent.setDataAndType(uri, mime);
+                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        startActivity(Intent.createChooser(intent, "Open " + f.getName() + " with"));
+                    } catch (Exception e) {
+                        Toast.makeText(MainActivity.this, "Cannot open: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    }
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public void testPing(final String targetUrl) {
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    long start = System.currentTimeMillis();
+                    int latency = -1;
+                    try {
+                        String clean = (targetUrl != null && !targetUrl.isEmpty()) ? targetUrl : serverBaseUrl;
+                        if (clean.endsWith("/")) clean = clean.substring(0, clean.length() - 1);
+                        URL url = new URL(clean + "/api/status");
+                        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                        conn.setConnectTimeout(3000);
+                        conn.setReadTimeout(3000);
+                        conn.setRequestMethod("GET");
+                        int code = conn.getResponseCode();
+                        latency = (int)(System.currentTimeMillis() - start);
+                        conn.disconnect();
+                    } catch (Exception e) {
+                        latency = -1;
+                    }
+                    final int finalLatency = latency;
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (webView != null) {
+                                webView.evaluateJavascript("if (window.onPingResult) window.onPingResult(" + finalLatency + ");", null);
+                            }
+                        }
+                    });
+                }
+            }).start();
         }
     }
 

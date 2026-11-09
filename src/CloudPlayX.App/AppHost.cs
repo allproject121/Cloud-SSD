@@ -42,6 +42,7 @@ public sealed class AppHost : IAsyncDisposable
         SaveBackups = new SaveBackupService(paths.DataRoot, LoggerFactory.CreateLogger<SaveBackupService>());
         CacheIndex = new CacheIndex();
         MobileBridge = new LocalMobileBridgeService(this, LoggerFactory.CreateLogger<LocalMobileBridgeService>());
+        Offloader = new SmartStorageOffloaderService(this, LoggerFactory.CreateLogger<SmartStorageOffloaderService>());
         Engine = new StreamingEngine(Settings.Streaming, Settings.Network, Profiles,
             new MountReadExecutor(id => Mounts.Get(id) is { State: MountState.Mounted } s ? s.Root : null, id => Mounts.Get(id)?.Attribution),
             FileSize, _ => !_diskPressure, CacheIndex.IsCached, LoggerFactory.CreateLogger<StreamingEngine>());
@@ -93,6 +94,7 @@ public sealed class AppHost : IAsyncDisposable
     public MetricsCollector Metrics { get; }
     public PinKeeper Pins { get; }
     public LocalMobileBridgeService MobileBridge { get; }
+    public SmartStorageOffloaderService Offloader { get; }
     public IReadOnlyList<DependencyStatus> Dependencies { get; private set; } = [];
     public IReadOnlyList<RemoteEntry> Remotes { get; private set; } = [];
     public LaunchSession? CurrentLaunch { get; private set; }

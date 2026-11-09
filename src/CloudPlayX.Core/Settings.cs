@@ -17,6 +17,7 @@ public sealed class AppSettings
     public bool FirstRunCompleted { get; set; }
     public string? LocalGamesRoot { get; set; }
     public MobileBridgeSettings MobileBridge { get; set; } = new();
+    public SmartOffloadSettings SmartOffload { get; set; } = new();
 }
 
 public sealed class CacheSettings
@@ -146,6 +147,18 @@ public sealed class PairedDevice
     public DateTimeOffset PairedAt { get; set; } = DateTimeOffset.Now;
     public DateTimeOffset LastSeen { get; set; } = DateTimeOffset.Now;
     public bool IsBlocked { get; set; }
+}
+
+public sealed class SmartOffloadSettings
+{
+    public bool Enabled { get; set; } = true;
+    public double MinFreeSpaceThresholdGB { get; set; } = 15.0;
+    public string TargetMountId { get; set; } = "cloudssd15tb";
+    public string TargetSubfolder { get; set; } = "Offloaded_Files";
+    public bool OffloadUploadsFolder { get; set; } = true;
+    public bool EvictVfsCacheOnLowSpace { get; set; } = true;
+    public DateTimeOffset? LastOffloadTime { get; set; }
+    public long TotalBytesOffloaded { get; set; }
 }
 
 public interface ISettingsStore

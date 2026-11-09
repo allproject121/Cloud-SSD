@@ -1940,3 +1940,1409 @@ body {
 .tc-action-btn:active {
   background: rgba(66, 133, 244, 0.2);
 }
+
+
+/* =============================================================
+   NEW REDESIGN STYLES (Matching User's Hand-drawn Sketch)
+   ============================================================= */
+
+/* 1. Hardware & Storage Widgets 2x2 Grid */
+.hardware-widgets-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.hw-widget-card {
+  background: var(--md-sys-color-surface);
+  border-radius: 18px;
+  padding: 14px;
+  border: 1px solid var(--divider);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.15s ease, background 0.15s ease;
+  cursor: pointer;
+}
+
+.hw-widget-card:active {
+  transform: scale(0.98);
+  background: var(--md-sys-color-surface-variant);
+}
+
+.hw-widget-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.hw-icon-box {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hw-icon-box svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+
+.hw-icon-box.ram-icon {
+  background: rgba(168, 199, 250, 0.14);
+  color: #A8C7FA;
+}
+
+.hw-icon-box.storage-icon {
+  background: rgba(251, 188, 4, 0.14);
+  color: #FDD663;
+}
+
+.hw-icon-box.ssd-icon {
+  background: rgba(52, 168, 83, 0.14);
+  color: #6DD58C;
+}
+
+.hw-icon-box.pc-icon {
+  background: rgba(194, 231, 255, 0.14);
+  color: #78D9EC;
+}
+
+.hw-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.hw-badge.online {
+  background: rgba(52, 168, 83, 0.18);
+  color: #6DD58C;
+}
+
+.hw-widget-label {
+  font-size: 12px;
+  color: var(--dim);
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+
+.hw-widget-val {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--md-sys-color-on-surface);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 8px;
+}
+
+.hw-widget-bar {
+  height: 5px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.hw-widget-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: #A8C7FA;
+  transition: width 0.3s ease;
+}
+
+.hw-widget-bar-fill.storage {
+  background: #FDD663;
+}
+
+.hw-widget-bar-fill.ssd {
+  background: #6DD58C;
+}
+
+.hw-widget-bar-fill.pc {
+  background: #78D9EC;
+}
+
+/* 2. PC Connection Banner Card with Disconnect / Connect Button */
+.pc-connection-banner-card {
+  background: linear-gradient(135deg, rgba(8, 66, 160, 0.28) 0%, rgba(30, 31, 36, 0.95) 100%);
+  border: 1px solid rgba(168, 199, 250, 0.22);
+  border-radius: 20px;
+  padding: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  margin-top: 4px;
+}
+
+.pc-conn-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+  min-width: 0;
+}
+
+.pc-conn-icon-halo {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: rgba(168, 199, 250, 0.16);
+  color: #A8C7FA;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.pc-conn-icon-halo svg {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+}
+
+.pc-conn-pulse-dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #34A853;
+  border: 2px solid var(--md-sys-color-background);
+  box-shadow: 0 0 8px #34A853;
+  animation: pulseBeacon 2s infinite;
+}
+
+.pc-conn-pulse-dot.offline {
+  background: #EA4335;
+  box-shadow: 0 0 8px #EA4335;
+  animation: none;
+}
+
+@keyframes pulseBeacon {
+  0% { transform: scale(0.95); opacity: 0.8; }
+  50% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(0.95); opacity: 0.8; }
+}
+
+.pc-conn-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.pc-conn-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--md-sys-color-on-surface);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pc-conn-sub {
+  font-size: 12px;
+  color: var(--dim);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pc-conn-pills-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.pc-conn-pill {
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.pc-conn-pill.speed {
+  background: rgba(251, 188, 4, 0.16);
+  color: #FDD663;
+}
+
+.pc-conn-pill.ping {
+  background: rgba(52, 168, 83, 0.16);
+  color: #6DD58C;
+}
+
+.pc-conn-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 10px;
+  flex-shrink: 0;
+}
+
+.pc-conn-toggle-btn {
+  padding: 8px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s ease;
+}
+
+.pc-conn-toggle-btn.disconnect {
+  background: rgba(234, 67, 53, 0.18);
+  color: #F2B8B5;
+  border: 1px solid rgba(234, 67, 53, 0.35);
+}
+
+.pc-conn-toggle-btn.disconnect:active {
+  background: rgba(234, 67, 53, 0.35);
+}
+
+.pc-conn-toggle-btn.connect {
+  background: #34A853;
+  color: #0D1117;
+  font-weight: 800;
+}
+
+.pc-conn-details-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  color: var(--dim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.pc-conn-details-btn svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+/* 3. Quick Action Strip */
+.quick-action-strip {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+
+.quick-action-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.quick-chip-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 24px;
+  background: var(--md-sys-color-surface);
+  border: 1px solid var(--divider);
+  color: var(--md-sys-color-on-surface);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+
+.quick-chip-btn:active {
+  transform: scale(0.97);
+}
+
+.quick-chip-btn svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+.quick-chip-btn.primary {
+  background: rgba(66, 133, 244, 0.2);
+  color: #A8C7FA;
+  border-color: rgba(66, 133, 244, 0.4);
+}
+
+/* 4. Recent Horizontal Scroll Cards */
+.recent-scroll-row {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 4px 0 10px 0;
+  scrollbar-width: none;
+}
+
+.recent-scroll-row::-webkit-scrollbar {
+  display: none;
+}
+
+.recent-file-card {
+  width: 140px;
+  background: var(--md-sys-color-surface);
+  border-radius: 16px;
+  padding: 12px;
+  border: 1px solid var(--divider);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.recent-file-card:active {
+  transform: scale(0.96);
+  background: var(--md-sys-color-surface-variant);
+}
+
+.recent-card-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.recent-card-icon svg {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+}
+
+.recent-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 4px;
+}
+
+.recent-card-meta {
+  font-size: 11px;
+  color: var(--dim);
+}
+
+/* 5. Phone Permission Banner */
+.phone-permission-card {
+  margin: 12px 16px 0 16px;
+  background: linear-gradient(135deg, rgba(234, 67, 53, 0.18), rgba(30, 31, 36, 0.95));
+  border: 1px solid rgba(234, 67, 53, 0.35);
+  border-radius: 18px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.perm-card-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: rgba(234, 67, 53, 0.2);
+  color: #F2B8B5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.perm-card-icon svg {
+  width: 22px;
+  height: 22px;
+  fill: currentColor;
+}
+
+.perm-card-body {
+  flex: 1;
+}
+
+.perm-card-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #F2B8B5;
+}
+
+.perm-card-sub {
+  font-size: 12px;
+  color: var(--dim);
+  margin-top: 2px;
+}
+
+.perm-grant-btn {
+  margin-top: 8px;
+  padding: 6px 14px;
+  border-radius: 16px;
+  border: none;
+  background: #EA4335;
+  color: #FFFFFF;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* 6. Mini Media Streaming Card */
+.mini-media-card {
+  margin: 12px 16px 0 16px;
+  background: var(--md-sys-color-surface);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  border-radius: 16px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mini-media-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(168, 85, 247, 0.18);
+  color: #D8B4FE;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.mini-media-icon svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+
+.mini-media-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.mini-media-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mini-media-sub {
+  font-size: 11.5px;
+  color: var(--dim);
+}
+
+.mini-media-btn {
+  padding: 6px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--divider);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--md-sys-color-primary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* 7. Categories Grid M3 (Phone Folder 8 Categories) */
+.categories-grid-m3 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.cat-grid-card {
+  background: var(--md-sys-color-surface);
+  border-radius: 18px;
+  padding: 14px;
+  border: 1px solid var(--divider);
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.cat-grid-card:active {
+  transform: scale(0.97);
+  background: var(--md-sys-color-surface-variant);
+}
+
+.cat-grid-icon-box {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.cat-grid-icon-box svg {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+}
+
+.cat-grid-name {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--md-sys-color-on-surface);
+}
+
+.cat-grid-meta {
+  font-size: 11.5px;
+  color: var(--dim);
+  margin-top: 2px;
+}
+
+/* 8. Phone Storage Segmented Usage Panel */
+.storage-usage-panel {
+  background: var(--md-sys-color-surface);
+  border-radius: 18px;
+  padding: 16px;
+  border: 1px solid var(--divider);
+}
+
+.storage-usage-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.storage-usage-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--md-sys-color-on-surface);
+}
+
+.storage-usage-free {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #6DD58C;
+}
+
+.storage-segmented-bar {
+  display: flex;
+  height: 8px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+  margin-bottom: 12px;
+  gap: 2px;
+}
+
+.bar-seg {
+  height: 100%;
+  border-radius: 3px;
+}
+
+.seg-images { background: #FFD8E4; }
+.seg-videos { background: #F2B8B5; }
+.seg-audio { background: #FDD663; }
+.seg-docs { background: #78D9EC; }
+.seg-other { background: #8E918F; }
+
+.storage-legend-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--dim);
+}
+
+.storage-legend-row span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.legend-dot.img { background: #FFD8E4; }
+.legend-dot.vid { background: #F2B8B5; }
+.legend-dot.aud { background: #FDD663; }
+.legend-dot.doc { background: #78D9EC; }
+.legend-dot.oth { background: #8E918F; }
+
+/* 9. Phone Folders List */
+.phone-folders-list {
+  background: var(--md-sys-color-surface);
+  border-radius: 18px;
+  border: 1px solid var(--divider);
+  overflow: hidden;
+}
+
+.phone-folder-row {
+  display: flex;
+  align-items: center;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--divider);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.phone-folder-row:last-child {
+  border-bottom: none;
+}
+
+.phone-folder-row:active {
+  background: var(--md-sys-color-surface-variant);
+}
+
+.pf-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: rgba(168, 199, 250, 0.12);
+  color: #A8C7FA;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 14px;
+  flex-shrink: 0;
+}
+
+.pf-icon svg {
+  width: 22px;
+  height: 22px;
+  fill: currentColor;
+}
+
+.pf-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.pf-name {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface);
+}
+
+.pf-sub {
+  font-size: 12px;
+  color: var(--dim);
+  margin-top: 2px;
+}
+
+.pf-arrow {
+  color: var(--dim);
+}
+
+.pf-arrow svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+
+/* 10. Phone Live Downloads List */
+.phone-file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.phone-file-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 14px;
+  background: var(--md-sys-color-surface);
+  border-radius: 14px;
+  border: 1px solid var(--divider);
+  cursor: pointer;
+}
+
+.phone-file-item:active {
+  background: var(--md-sys-color-surface-variant);
+}
+
+.pfi-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 12px;
+  flex-shrink: 0;
+}
+
+.pfi-icon svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+
+.pfi-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.pfi-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pfi-meta {
+  font-size: 11.5px;
+  color: var(--dim);
+  margin-top: 2px;
+}
+
+.pfi-btn {
+  padding: 6px 12px;
+  border-radius: 14px;
+  background: rgba(66, 133, 244, 0.15);
+  border: none;
+  color: #A8C7FA;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+/* 11. SSD Explorer Top Bar & Breadcrumbs */
+.ssd-top-bar {
+  position: sticky;
+  top: 70px;
+  z-index: 90;
+  background: var(--md-sys-color-background);
+  padding: 6px 16px 10px 16px;
+}
+
+.ssd-drives-strip {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.ssd-drives-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.ssd-drive-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 20px;
+  background: var(--md-sys-color-surface);
+  border: 1px solid var(--divider);
+  color: var(--dim);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.ssd-drive-pill svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+
+.ssd-drive-pill.active {
+  background: rgba(8, 66, 160, 0.4);
+  border-color: var(--md-sys-color-primary);
+  color: var(--md-sys-color-primary);
+}
+
+.ssd-path-bar {
+  display: flex;
+  align-items: center;
+  background: var(--md-sys-color-surface);
+  border-radius: 14px;
+  padding: 8px 12px;
+  border: 1px solid var(--divider);
+}
+
+.ssd-back-btn {
+  background: none;
+  border: none;
+  color: var(--md-sys-color-on-surface);
+  cursor: pointer;
+  padding: 4px;
+  margin-right: 8px;
+  display: flex;
+  align-items: center;
+}
+
+.ssd-back-btn svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+
+.ssd-path-text {
+  flex: 1;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ssd-view-controls {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.ssd-icon-btn {
+  background: none;
+  border: none;
+  color: var(--dim);
+  padding: 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.ssd-icon-btn:active {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--md-sys-color-on-surface);
+}
+
+.ssd-icon-btn svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+.ssd-items-wrapper {
+  padding: 0 16px;
+}
+
+/* 12. Dedicated PC Connection Modal Sheet */
+.connection-modal-sheet {
+  background: var(--md-sys-color-surface);
+  width: 100%;
+  max-width: 520px;
+  border-radius: 28px 28px 0 0;
+  padding: 16px 20px 32px 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.6);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.conn-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--divider);
+}
+
+.conn-modal-icon-wrap {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  background: rgba(168, 199, 250, 0.18);
+  color: #A8C7FA;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.conn-modal-icon-wrap svg {
+  width: 28px;
+  height: 28px;
+  fill: currentColor;
+}
+
+.conn-modal-pulse-dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #34A853;
+  border: 2px solid var(--md-sys-color-surface);
+  box-shadow: 0 0 10px #34A853;
+}
+
+.conn-modal-pulse-dot.offline {
+  background: #EA4335;
+  box-shadow: 0 0 10px #EA4335;
+}
+
+.conn-modal-header-info {
+  flex: 1;
+}
+
+.conn-modal-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--md-sys-color-on-surface);
+}
+
+.conn-modal-sub {
+  font-size: 13px;
+  color: var(--dim);
+  margin-top: 2px;
+}
+
+.conn-status-tag {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 12px;
+}
+
+.conn-status-tag.connected {
+  background: rgba(52, 168, 83, 0.2);
+  color: #6DD58C;
+}
+
+.conn-status-tag.offline {
+  background: rgba(234, 67, 53, 0.2);
+  color: #F2B8B5;
+}
+
+.conn-modal-close {
+  background: none;
+  border: none;
+  color: var(--dim);
+  cursor: pointer;
+  padding: 6px;
+}
+
+.conn-modal-close svg {
+  width: 22px;
+  height: 22px;
+  fill: currentColor;
+}
+
+.conn-details-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.conn-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--md-sys-color-surface-variant);
+}
+
+.conn-row-label {
+  font-size: 13px;
+  color: var(--dim);
+}
+
+.conn-row-val {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface);
+}
+
+.conn-row-val.highlight {
+  color: #6DD58C;
+}
+
+.conn-row-val.mono {
+  font-family: monospace;
+  font-size: 12.5px;
+}
+
+.conn-ping-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.conn-ping-btn {
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: rgba(66, 133, 244, 0.2);
+  color: #A8C7FA;
+  border: none;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.conn-modal-cta {
+  margin-bottom: 20px;
+}
+
+.conn-master-btn {
+  width: 100%;
+  padding: 14px;
+  border-radius: 24px;
+  border: none;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.conn-master-btn.disconnect {
+  background: rgba(234, 67, 53, 0.2);
+  color: #F2B8B5;
+  border: 1px solid rgba(234, 67, 53, 0.4);
+}
+
+.conn-master-btn.disconnect:active {
+  background: rgba(234, 67, 53, 0.4);
+}
+
+.conn-master-btn.connect {
+  background: #34A853;
+  color: #0F1117;
+}
+
+.conn-settings-fold {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 16px;
+  padding: 14px;
+  border: 1px solid var(--divider);
+}
+
+.conn-fold-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-bottom: 10px;
+}
+
+.conn-input-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.modal-btn-sm {
+  padding: 8px 18px;
+  border-radius: 12px;
+  background: var(--md-sys-color-primary);
+  color: #0842A0;
+  border: none;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.conn-fold-sub {
+  font-size: 12px;
+  color: var(--dim);
+}
+
+.conn-fold-sub code {
+  color: #A8C7FA;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+/* 13. Gaming Tab Adjustments */
+.gaming-hero-card {
+  margin: 12px 16px;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.25), rgba(0, 210, 255, 0.15));
+  border-radius: 20px;
+  padding: 18px;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+}
+
+.gaming-hero-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.gaming-badge {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 10px;
+  background: rgba(52, 168, 83, 0.2);
+  color: #6DD58C;
+  text-transform: uppercase;
+}
+
+.gaming-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--md-sys-color-on-surface);
+  margin-top: 4px;
+}
+
+.gaming-refresh-btn {
+  padding: 6px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: var(--md-sys-color-on-surface);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.gaming-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.gm-card {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 12px;
+  padding: 10px 8px;
+  text-align: center;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.gm-val {
+  font-size: 15px;
+  font-weight: 800;
+  color: #A8C7FA;
+}
+
+.gm-label {
+  font-size: 9.5px;
+  color: var(--dim);
+  margin-top: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.remote-controls-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.remote-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 16px;
+  background: var(--md-sys-color-surface);
+  border: 1px solid var(--divider);
+  color: var(--md-sys-color-on-surface);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.remote-btn:active {
+  transform: scale(0.97);
+  background: var(--md-sys-color-surface-variant);
+}
+
+.remote-btn svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+
+/* Explorer Items (Cloud SSD tab) */
+.ssd-items-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px 96px 16px;
+}
+
+.ssd-items-container.grid-view {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.explorer-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--md-sys-color-surface);
+  border: 1px solid var(--divider);
+  border-radius: 16px;
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.12s ease;
+  user-select: none;
+}
+
+.explorer-item:active {
+  transform: scale(0.98);
+  background: var(--md-sys-color-surface-variant);
+}
+
+.explorer-item .item-icon {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  max-width: 44px;
+  max-height: 44px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.explorer-item .item-icon.folder-icon {
+  background: rgba(168, 199, 250, 0.12);
+  color: #A8C7FA;
+}
+
+.explorer-item .item-icon svg {
+  width: 24px;
+  height: 24px;
+  max-width: 24px;
+  max-height: 24px;
+  fill: currentColor;
+}
+
+.explorer-item .item-details {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.explorer-item .item-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.explorer-item .item-meta {
+  font-size: 11.5px;
+  color: var(--dim);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.explorer-item .item-action-icon {
+  width: 24px;
+  height: 24px;
+  color: var(--dim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.explorer-item .item-action-icon svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+.explorer-item .item-more-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--dim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.explorer-item .item-more-btn svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+
+/* Grid View specific overrides */
+.ssd-items-container.grid-view .explorer-item {
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 14px;
+  position: relative;
+}
+
+.ssd-items-container.grid-view .explorer-item .item-icon {
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  min-height: 48px;
+  max-width: 48px;
+  max-height: 48px;
+  margin-bottom: 8px;
+}
+
+.ssd-items-container.grid-view .explorer-item .item-details {
+  width: 100%;
+}
+
+.ssd-items-container.grid-view .explorer-item .item-action-icon {
+  position: absolute;
+  top: 14px;
+  right: 12px;
+}
+
+.ssd-items-container.grid-view .explorer-item .item-more-btn {
+  position: absolute;
+  top: 8px;
+  right: 6px;
+}

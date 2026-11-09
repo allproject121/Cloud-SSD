@@ -157,3 +157,19 @@ Poore project aur compiled binary files ki gehri jaanch ki gayi:
      - Recompiled self-contained .NET 10 x64 win-x64 binary with Inno Setup 6.
      - Generated eleases/Cloud-SSD-0.7.0-setup.exe (68.7 MB, SHA256: e699783c07810e15d96fe9b054b21218a8cf163332dc0fb9db54e1d7bd70d579).
      - Bundled genuine signed WinFsp 2.1 driver installer.
+
+### [Step 3.10] - 2026-11-09 19:37:00 IST
+- **Task**: Mobile App Permissions Expansion, UI Enhancement & Fresh Installer Release
+- **Status**: COMPLETED
+- **Detailed Key Changes**:
+  1. **Android Manifest & Permissions**:
+     - Added WRITE_EXTERNAL_STORAGE (maxSdk 29) and READ_MEDIA_AUDIO to enable comprehensive local game save and audio assets backup.
+     - Updated Android app display name to **Cloud Drive** in strings.xml.
+  2. **Mobile Web Assets & JavaScript Engine Refactoring**:
+     - Extensive overhaul of pp.js, pp.css, and index.html with improved responsive layouts, device orientation adaptations, and faster telemetry socket handlers.
+     - Synced assets between mobile-android/ and src/CloudPlayX.Desktop/wwwroot/mobile/.
+  3. **Fresh Windows Setup Installer (Inno Setup 6)**:
+     - Recompiled Cloud-SSD-0.7.0-setup.exe (68.7 MB, SHA256: ca71320de1043bd105c2609ffcb8d2dadd59fe1ae035fe52ab9111f6ad63cb4f).
+  4. **GitHub Releases Deployment**:
+     - Synced Cloud-SSD-0.7.0-setup.exe, Cloud-SSD-Mobile.apk, and CloudDrive.apk into eleases/.
+     - Pushed all commits to https://github.com/allproject121/Cloud-Drive.git.
