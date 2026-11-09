@@ -119,6 +119,7 @@
     } else if (tabName === 'clean') {
       refreshCleanStats();
     } else if (tabName === 'share') {
+      fetchTransferHistory();
       refreshShareActivity();
     } else if (tabName === 'gaming') {
       loadGameSaves();
@@ -139,14 +140,21 @@
       return true;
     }
 
-    // 1. If video modal is open
+    // 1. If file viewer modal is open
+    const viewerModal = document.getElementById('file-viewer-modal');
+    if (viewerModal && viewerModal.style.display === 'flex') {
+      closeViewerModal();
+      return true;
+    }
+
+    // 2. If legacy video modal is open
     const videoModal = document.getElementById('video-modal');
     if (videoModal && videoModal.style.display === 'flex') {
       closeVideoModal();
       return true;
     }
 
-    // 2. If settings modal is open
+    // 3. If settings modal is open
     const settingsModal = document.getElementById('settings-modal');
     if (settingsModal && settingsModal.style.display === 'flex') {
       closeSettingsModal();
@@ -255,9 +263,81 @@
   }
 
   // -------------------------------------------------------------
+  // Phone Live Hardware Metrics (Internal Storage & RAM)
+  // -------------------------------------------------------------
+  window.updatePhoneSystemMetrics = function() {
+    try {
+      let stats = null;
+      if (window.AndroidBridge && window.AndroidBridge.getPhoneStats) {
+        const raw = window.AndroidBridge.getPhoneStats();
+        if (raw) stats = JSON.parse(raw);
+      }
+
+      if (stats && stats.storageTotal > 0) {
+        const used = stats.storageUsed;
+        const total = stats.storageTotal;
+        const free = stats.storageFree;
+        const pct = Math.min(100, Math.max(0, Math.round((used / total) * 100)));
+
+        const subEl = document.getElementById('phone-storage-sub');
+        const badgeEl = document.getElementById('phone-storage-badge');
+        const barEl = document.getElementById('phone-storage-bar');
+        const titleEl = document.getElementById('phone-storage-title');
+
+        if (titleEl && stats.model) {
+          titleEl.textContent = `${stats.model} Internal`;
+        }
+        if (badgeEl) badgeEl.textContent = `${formatBytes(free)} free`;
+        if (subEl) subEl.textContent = `${formatBytes(used)} used / ${formatBytes(total)} • ${pct}%`;
+        if (barEl) {
+          barEl.style.width = `${pct}%`;
+          barEl.style.background = pct > 85 ? '#EA4335' : (pct > 70 ? '#FBBC04' : '#34A853');
+        }
+
+        // RAM
+        if (stats.ramTotal > 0) {
+          const ramUsed = stats.ramUsed;
+          const ramTotal = stats.ramTotal;
+          const ramFree = stats.ramFree;
+          const ramPct = Math.min(100, Math.max(0, Math.round((ramUsed / ramTotal) * 100)));
+
+          const ramSubEl = document.getElementById('phone-ram-sub');
+          const ramBadgeEl = document.getElementById('phone-ram-badge');
+          const ramBarEl = document.getElementById('phone-ram-bar');
+
+          if (ramBadgeEl) ramBadgeEl.textContent = `${formatBytes(ramFree)} free`;
+          if (ramSubEl) ramSubEl.textContent = `${formatBytes(ramUsed)} used / ${formatBytes(ramTotal)} • ${ramPct}%`;
+          if (ramBarEl) {
+            ramBarEl.style.width = `${ramPct}%`;
+            ramBarEl.style.background = ramPct > 85 ? '#EA4335' : (ramPct > 70 ? '#FBBC04' : '#34A853');
+          }
+        }
+      } else {
+        // Fallback for standalone browser preview
+        const subEl = document.getElementById('phone-storage-sub');
+        const badgeEl = document.getElementById('phone-storage-badge');
+        const barEl = document.getElementById('phone-storage-bar');
+        if (badgeEl) badgeEl.textContent = '75.2 GB free';
+        if (subEl) subEl.textContent = '26.1 GB used / 101.3 GB • 26%';
+        if (barEl) barEl.style.width = '26%';
+
+        const ramSubEl = document.getElementById('phone-ram-sub');
+        const ramBadgeEl = document.getElementById('phone-ram-badge');
+        const ramBarEl = document.getElementById('phone-ram-bar');
+        if (ramBadgeEl) ramBadgeEl.textContent = '2.9 GB free';
+        if (ramSubEl) ramSubEl.textContent = '4.6 GB used / 7.5 GB • 61%';
+        if (ramBarEl) ramBarEl.style.width = '61%';
+      }
+    } catch (e) {
+      console.warn('Failed to update phone system metrics:', e);
+    }
+  };
+
+  // -------------------------------------------------------------
   // Categories & Storage Devices (Browse Screen)
   // -------------------------------------------------------------
   window.loadStorageDevices = async function() {
+    updatePhoneSystemMetrics();
     const list = document.getElementById('storage-devices-list');
     if (!list) return;
 
@@ -535,7 +615,7 @@
       `;
 
       row.onclick = () => {
-        openFileActionsSheet(file);
+        openFile(file);
       };
 
       const moreBtn = row.querySelector('.more-btn');
@@ -579,10 +659,13 @@
     document.getElementById('sheet-file-meta').textContent = `${file.sizeFormatted || formatBytes(file.size || 0)} • Cloud-SSD`;
     document.getElementById('sheet-file-path-sub').textContent = file.path || 'Virtual Drive Z:\\';
 
-    // Show/hide Play button based on media
-    const streamBtn = document.getElementById('sheet-btn-stream');
-    if (streamBtn) {
-      streamBtn.style.display = (file.isVideo || pres.type === 'video' || file.isAudio || pres.type === 'audio') ? 'flex' : 'none';
+    // Update Open button label based on file type
+    const openLabel = document.getElementById('sheet-open-label');
+    if (openLabel) {
+      if (file.isVideo || pres.type === 'video') openLabel.textContent = 'Play';
+      else if (file.isAudio || pres.type === 'audio') openLabel.textContent = 'Listen';
+      else if (pres.type === 'image') openLabel.textContent = 'View';
+      else openLabel.textContent = 'Open';
     }
 
     // Update Star state
@@ -608,11 +691,32 @@
     currentSheetFile = null;
   };
 
+  window.sheetActionOpen = function() {
+    if (!currentSheetFile) return;
+    const file = currentSheetFile;
+    closeFileActionsSheet();
+    openFile(file);
+  };
+
+  window.sheetActionOpenWith = function() {
+    if (!currentSheetFile) return;
+    const file = currentSheetFile;
+    closeFileActionsSheet();
+    openWithExternal(file);
+  };
+
+  window.sheetActionOpenOnPc = function() {
+    if (!currentSheetFile) return;
+    const file = currentSheetFile;
+    closeFileActionsSheet();
+    openOnPc(file);
+  };
+
   window.sheetActionStream = function() {
     if (!currentSheetFile) return;
     const file = currentSheetFile;
     closeFileActionsSheet();
-    streamVideo(encodeURIComponent(file.path), file.name);
+    openFile(file);
   };
 
   window.sheetActionDownload = function() {
@@ -926,13 +1030,21 @@
   // File Transfers (Send / Download / Stream)
   // -------------------------------------------------------------
   window.triggerFileUpload = function() {
-    const input = document.getElementById('file-uploader');
-    if (input) input.click();
+    if (window.AndroidBridge && window.AndroidBridge.pickAndUploadFiles) {
+      window.AndroidBridge.pickAndUploadFiles('files');
+    } else {
+      const input = document.getElementById('file-uploader');
+      if (input) input.click();
+    }
   };
 
   window.openPhotoPicker = function() {
-    const picker = document.getElementById('photo-uploader');
-    if (picker) picker.click();
+    if (window.AndroidBridge && window.AndroidBridge.pickAndUploadFiles) {
+      window.AndroidBridge.pickAndUploadFiles('photos');
+    } else {
+      const picker = document.getElementById('photo-uploader');
+      if (picker) picker.click();
+    }
   };
 
   window.handleFileSelection = async function(event) {
@@ -941,16 +1053,19 @@
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      showToast(`Uploading ${file.name}...`);
+      showToast(`Sending ${file.name} to PC...`);
 
       try {
         let url = apiUrl(`/api/upload?filename=${encodeURIComponent(file.name)}`);
         if (pairingToken) url += `&token=${encodeURIComponent(pairingToken)}`;
 
+        const headers = { ...getAuthHeaders() };
+        const arrayBuffer = await file.arrayBuffer();
+
         const res = await fetch(url, {
           method: 'POST',
-          headers: { 'Content-Length': file.size },
-          body: file
+          headers: headers,
+          body: arrayBuffer
         });
 
         if (res.ok) {
@@ -959,53 +1074,279 @@
           refreshShareActivity();
           refreshRecentFiles();
         } else {
-          showToast(`Upload failed`);
+          showToast(`Upload failed: ${res.statusText}`);
         }
       } catch (err) {
-        showToast(`Error: ${err.message}`);
+        showToast(`Send error: ${err.message}`);
       }
     }
+    // Reset so user can select the same file again
+    event.target.value = '';
   };
 
-  window.downloadFile = function(encodedPath) {
-    let url = apiUrl(`/api/download?path=${encodedPath}`);
+  window.downloadFile = function(pathOrEncoded) {
+    let p = pathOrEncoded;
+    try {
+      if (typeof p === 'string' && p.includes('%')) {
+        p = decodeURIComponent(p);
+      }
+    } catch (e) { }
+    const fileName = p.split('\\').pop() || p.split('/').pop() || 'download';
+    let url = apiUrl(`/api/download?path=${encodeURIComponent(p)}`);
     if (pairingToken) url += `&token=${encodeURIComponent(pairingToken)}`;
     
-    showToast('Starting download...');
-    const a = document.createElement('a');
-    a.href = url;
-    a.setAttribute('download', '');
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    showToast(`Starting download: ${fileName}`);
 
-    addRecentActivity(`Downloaded: ${decodeURIComponent(encodedPath).split('\\').pop()}`);
+    // Show floating card immediately
+    if (window.onDownloadProgress) {
+      window.onDownloadProgress(fileName, 0, 0, 0, 0);
+    }
+
+    if (window.AndroidBridge && window.AndroidBridge.downloadFile) {
+      window.AndroidBridge.downloadFile(url, fileName);
+    } else {
+      downloadFileInBrowser(url, fileName);
+    }
+
+    addRecentActivity(`Downloaded: ${fileName}`);
     refreshRecentFiles();
   };
 
-  window.streamVideo = function(encodedPath, filename) {
-    const modal = document.getElementById('video-modal');
-    const player = document.getElementById('native-video-player');
-    const title = document.getElementById('video-player-filename');
-    if (!modal || !player) return;
+  async function downloadFileInBrowser(url, fileName) {
+    try {
+      const startTime = Date.now();
+      let lastTime = startTime;
+      let lastBytes = 0;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Download failed: ' + res.status);
+      const total = parseInt(res.headers.get('content-length') || '0', 10);
+      const reader = res.body ? res.body.getReader() : null;
 
-    let url = apiUrl(`/api/stream?path=${encodedPath}`);
-    if (pairingToken) url += `&token=${encodeURIComponent(pairingToken)}`;
+      if (!reader) {
+        const blob = await res.blob();
+        saveBlobAs(blob, fileName);
+        if (window.onDownloadComplete) window.onDownloadComplete(fileName, blob.size);
+        return;
+      }
 
-    title.textContent = filename || 'Media Playback';
-    player.src = url;
+      let received = 0;
+      const chunks = [];
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        received += value.length;
+
+        const now = Date.now();
+        const delta = now - lastTime;
+        if (delta >= 250) {
+          const deltaBytes = received - lastBytes;
+          const speed = (deltaBytes / (1024 * 1024)) / (delta / 1000);
+          lastTime = now;
+          lastBytes = received;
+          const pct = total > 0 ? Math.round((received * 100) / total) : -1;
+          if (window.onDownloadProgress) window.onDownloadProgress(fileName, pct, speed, received, total);
+        }
+      }
+
+      const blob = new Blob(chunks);
+      saveBlobAs(blob, fileName);
+      if (window.onDownloadComplete) window.onDownloadComplete(fileName, blob.size);
+    } catch (err) {
+      if (window.onDownloadError) window.onDownloadError(fileName, err.message);
+    }
+  }
+
+  function saveBlobAs(blob, fileName) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+    }, 1000);
+  }
+
+  // -------------------------------------------------------------
+  // Universal File Viewer & Native System Integration
+  // -------------------------------------------------------------
+  let currentViewerFile = null;
+
+  function getMimeType(fileName) {
+    const ext = (fileName.split('.').pop() || '').toLowerCase();
+    const map = {
+      'mp4': 'video/mp4', 'mkv': 'video/x-matroska', 'webm': 'video/webm', 'avi': 'video/x-msvideo', 'mov': 'video/quicktime', 'm4v': 'video/mp4',
+      'mp3': 'audio/mpeg', 'wav': 'audio/wav', 'ogg': 'audio/ogg', 'flac': 'audio/flac', 'm4a': 'audio/mp4', 'aac': 'audio/aac',
+      'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'png': 'image/png', 'gif': 'image/gif', 'webp': 'image/webp', 'bmp': 'image/bmp', 'svg': 'image/svg+xml',
+      'pdf': 'application/pdf', 'txt': 'text/plain', 'log': 'text/plain', 'md': 'text/plain', 'json': 'application/json', 'csv': 'text/plain',
+      'apk': 'application/vnd.android.package-archive', 'zip': 'application/zip', 'rar': 'application/vnd.rar', '7z': 'application/x-7z-compressed'
+    };
+    return map[ext] || 'application/octet-stream';
+  }
+
+  window.openFile = function(file) {
+    if (!file) return;
+    currentViewerFile = file;
+
+    const modal = document.getElementById('file-viewer-modal');
+    if (!modal) {
+      openFileActionsSheet(file);
+      return;
+    }
+
+    const pres = getFilePresentation(file);
+    const ext = (file.name.split('.').pop() || '').toLowerCase();
+
+    // Set Header
+    const fnEl = document.getElementById('viewer-filename');
+    if (fnEl) fnEl.textContent = file.name;
+    const metaEl = document.getElementById('viewer-meta');
+    if (metaEl) metaEl.textContent = `${file.sizeFormatted || formatBytes(file.size || 0)} • Cloud-SSD Drive`;
+
+    // Hide all viewer sections first
+    const sections = ['viewer-section-video', 'viewer-section-image', 'viewer-section-audio', 'viewer-section-text', 'viewer-section-generic'];
+    sections.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
+
+    let streamUrl = apiUrl(`/api/stream?path=${encodeURIComponent(file.path)}`);
+    if (pairingToken) streamUrl += `&token=${encodeURIComponent(pairingToken)}`;
+
+    if (pres.type === 'video') {
+      const sec = document.getElementById('viewer-section-video');
+      const player = document.getElementById('native-video-player');
+      if (sec && player) {
+        sec.style.display = 'flex';
+        player.src = streamUrl;
+        player.play().catch(() => {});
+      }
+    } else if (pres.type === 'image') {
+      const sec = document.getElementById('viewer-section-image');
+      const img = document.getElementById('viewer-image-elem');
+      if (sec && img) {
+        sec.style.display = 'flex';
+        img.src = streamUrl;
+      }
+    } else if (pres.type === 'audio') {
+      const sec = document.getElementById('viewer-section-audio');
+      const audio = document.getElementById('viewer-audio-player');
+      const title = document.getElementById('viewer-audio-title');
+      if (sec && audio) {
+        sec.style.display = 'flex';
+        if (title) title.textContent = file.name;
+        audio.src = streamUrl;
+        audio.play().catch(() => {});
+      }
+    } else if (['txt', 'log', 'md', 'json', 'xml', 'csv', 'yaml', 'yml', 'cs', 'java', 'js', 'html', 'css', 'ini', 'cfg'].includes(ext)) {
+      const sec = document.getElementById('viewer-section-text');
+      const code = document.getElementById('viewer-text-content');
+      if (sec && code) {
+        sec.style.display = 'flex';
+        code.textContent = 'Loading preview...';
+        fetch(apiUrl(`/api/preview?path=${encodeURIComponent(file.path)}`), { headers: getAuthHeaders() })
+          .then(r => r.json())
+          .then(data => {
+            if (data.isBinary) {
+              code.textContent = '[Binary data cannot be displayed as plain text]';
+            } else {
+              code.textContent = data.content || '[Empty file]';
+            }
+          })
+          .catch(err => {
+            code.textContent = `Unable to load preview: ${err.message}`;
+          });
+      }
+    } else {
+      // Generic / Doc / APK / Archive
+      const sec = document.getElementById('viewer-section-generic');
+      const icon = document.getElementById('viewer-generic-icon');
+      const name = document.getElementById('viewer-generic-name');
+      const sub = document.getElementById('viewer-generic-sub');
+      if (sec) {
+        sec.style.display = 'flex';
+        if (icon) {
+          icon.innerHTML = pres.svg;
+          icon.style.background = pres.bg;
+          icon.style.color = pres.fg;
+        }
+        if (name) name.textContent = file.name;
+        if (sub) sub.textContent = `${file.sizeFormatted || formatBytes(file.size || 0)} • Tap below to open`;
+      }
+    }
+
     modal.style.display = 'flex';
-    player.play().catch(() => {});
+    addRecentActivity(`Opened: ${file.name}`);
+  };
+
+  window.closeViewerModal = function(e) {
+    if (e && e.target && e.target.id !== 'file-viewer-modal' && !e.target.closest('.viewer-btn-icon')) return;
+    const modal = document.getElementById('file-viewer-modal');
+    const video = document.getElementById('native-video-player');
+    const audio = document.getElementById('viewer-audio-player');
+    const img = document.getElementById('viewer-image-elem');
+
+    if (video) { video.pause(); video.src = ''; }
+    if (audio) { audio.pause(); audio.src = ''; }
+    if (img) { img.src = ''; }
+
+    if (modal) modal.style.display = 'none';
+  };
+
+  window.openWithCurrentFile = function() {
+    if (!currentViewerFile) return;
+    openWithExternal(currentViewerFile);
+  };
+
+  window.openWithExternal = function(file) {
+    if (!file) return;
+    let url = apiUrl(`/api/stream?path=${encodeURIComponent(file.path)}`);
+    if (pairingToken) url += `&token=${encodeURIComponent(pairingToken)}`;
+    const mime = getMimeType(file.name);
+
+    if (window.AndroidBridge && window.AndroidBridge.openWith) {
+      showToast(`Opening with phone apps…`);
+      window.AndroidBridge.openWith(url, mime, file.name);
+    } else {
+      window.open(url, '_blank');
+    }
+    addRecentActivity(`Opened with app: ${file.name}`);
+  };
+
+  window.openOnPcCurrentFile = function() {
+    if (!currentViewerFile) return;
+    openOnPc(currentViewerFile);
+  };
+
+  window.openOnPc = async function(file) {
+    if (!file) return;
+    showToast(`Opening on PC: ${file.name}…`);
+    try {
+      const res = await fetch(apiUrl(`/api/open-pc?path=${encodeURIComponent(file.path)}`), { headers: getAuthHeaders() });
+      const data = await res.json();
+      if (data.success) {
+        showToast(`Opened '${file.name}' on PC!`);
+      } else {
+        showToast(`PC open error: ${data.error || 'Failed'}`);
+      }
+    } catch (err) {
+      showToast(`Cannot reach PC: ${err.message}`);
+    }
+  };
+
+  window.downloadCurrentFile = function() {
+    if (!currentViewerFile) return;
+    downloadFile(encodeURIComponent(currentViewerFile.path));
+  };
+
+  window.streamVideo = function(encodedPath, filename) {
+    openFile({ path: decodeURIComponent(encodedPath), name: filename || 'Video', isVideo: true });
   };
 
   window.closeVideoModal = function() {
-    const modal = document.getElementById('video-modal');
-    const player = document.getElementById('native-video-player');
-    if (player) {
-      player.pause();
-      player.src = '';
-    }
-    if (modal) modal.style.display = 'none';
+    closeViewerModal();
   };
 
   // -------------------------------------------------------------
@@ -1095,6 +1436,362 @@
     showToast('History cleared');
     refreshRecentFiles();
     refreshShareActivity();
+  };
+
+  // -------------------------------------------------------------
+  // Download Progress Card Callbacks & System Handlers
+  // -------------------------------------------------------------
+  window.onDownloadProgress = function(fileName, progress, speedMBps, curBytes, totalBytes) {
+    const card = document.getElementById('download-progress-card');
+    if (!card) return;
+    card.style.display = 'block';
+    card.classList.remove('complete');
+
+    const title = document.getElementById('dl-file-name');
+    if (title) title.textContent = fileName;
+
+    const stats = document.getElementById('dl-stats');
+    if (stats) {
+      const speedStr = (typeof speedMBps === 'number' && speedMBps > 0) ? ` • ⚡ ${speedMBps.toFixed(1)} MB/s` : '';
+      const sizeStr = (curBytes && totalBytes && totalBytes > 0) ? ` (${formatSize(curBytes)} / ${formatSize(totalBytes)})` : (curBytes ? ` (${formatSize(curBytes)})` : '');
+      const pctStr = progress >= 0 ? `${progress}%` : 'Downloading';
+      stats.textContent = `${pctStr}${speedStr}${sizeStr}`;
+    }
+
+    const bar = document.getElementById('dl-progress-bar');
+    if (bar) {
+      bar.style.width = (progress >= 0 ? Math.max(0, Math.min(100, progress)) : 45) + '%';
+    }
+  };
+
+  window.onDownloadComplete = function(fileName, totalBytes) {
+    const card = document.getElementById('download-progress-card');
+    if (card) {
+      card.classList.add('complete');
+      const stats = document.getElementById('dl-stats');
+      const sizeStr = totalBytes ? ` (${formatSize(totalBytes)})` : '';
+      if (stats) stats.textContent = `✓ Download Complete${sizeStr} • Saved to Downloads`;
+      const bar = document.getElementById('dl-progress-bar');
+      if (bar) bar.style.width = '100%';
+      setTimeout(() => {
+        card.style.display = 'none';
+        card.classList.remove('complete');
+      }, 3500);
+    }
+    fetchTransferHistory(true);
+    refreshRecentFiles();
+  };
+
+  window.onDownloadError = function(fileName, err) {
+    const card = document.getElementById('download-progress-card');
+    if (card) {
+      const stats = document.getElementById('dl-stats');
+      if (stats) stats.textContent = `⚠ Download Error: ${err}`;
+      setTimeout(() => {
+        card.style.display = 'none';
+      }, 4000);
+    }
+  };
+
+  window.dismissDownloadCard = function() {
+    const card = document.getElementById('download-progress-card');
+    if (card) card.style.display = 'none';
+  };
+
+  // -------------------------------------------------------------
+  // Synchronized Transfer History Management
+  // -------------------------------------------------------------
+  let serverTransfersList = [];
+  let currentTransferFilter = 'all';
+
+  window.fetchTransferHistory = async function(force) {
+    const container = document.getElementById('share-transfers-container');
+    if (!container) return;
+
+    try {
+      const res = await fetch(apiUrl('/api/transfers'), { headers: getAuthHeaders() });
+      if (res.ok) {
+        serverTransfersList = await res.json();
+      }
+    } catch (e) {
+      // Fallback
+    }
+
+    renderTransferHistory();
+  };
+
+  window.filterShareHistory = function(filterKey) {
+    currentTransferFilter = filterKey;
+    document.querySelectorAll('.transfer-chip').forEach(c => {
+      c.classList.toggle('active', c.id === `chip-filter-${filterKey}`);
+    });
+    renderTransferHistory();
+  };
+
+  function renderTransferHistory() {
+    const container = document.getElementById('share-transfers-container');
+    if (!container) return;
+
+    const countEl = document.getElementById('share-history-count');
+    if (countEl) countEl.textContent = serverTransfersList.length;
+
+    let items = serverTransfersList;
+    if (currentTransferFilter === 'received') {
+      items = items.filter(t => t.direction === 'upload');
+    } else if (currentTransferFilter === 'sent') {
+      items = items.filter(t => t.direction === 'download');
+    } else if (currentTransferFilter === 'stream') {
+      items = items.filter(t => t.direction === 'stream');
+    }
+
+    if (!items || items.length === 0) {
+      container.innerHTML = '<div class="empty-state-text">No transfers matching this filter. Send or download files to see history.</div>';
+      return;
+    }
+
+    container.innerHTML = '';
+    items.forEach(t => {
+      const card = document.createElement('div');
+      card.className = 'transfer-card-item';
+
+      let dirBadge = '↓ Received';
+      let dirClass = 'received';
+      let iconColor = 'rgba(52, 168, 83, 0.18)';
+      let textColor = '#6DD58C';
+      if (t.direction === 'download') {
+        dirBadge = '↑ Sent';
+        dirClass = 'sent';
+        iconColor = 'rgba(66, 133, 244, 0.18)';
+        textColor = '#A8C7FA';
+      } else if (t.direction === 'stream') {
+        dirBadge = '► Streamed';
+        dirClass = 'stream';
+        iconColor = 'rgba(168, 85, 247, 0.18)';
+        textColor = '#D8B4FE';
+      }
+
+      const fileIcon = getIconForFileName(t.fileName);
+      const timeStr = t.timestamp ? new Date(t.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+      const speedStr = (t.speedMBps && t.speedMBps > 0) ? `⚡ ${t.speedMBps.toFixed(1)} MB/s` : '';
+      const sizeStr = t.sizeFormatted || formatSize(t.bytes || 0);
+
+      card.innerHTML = `
+        <div class="tc-left">
+          <div class="tc-icon-wrap" style="background: ${iconColor}; color: ${textColor};">
+            ${fileIcon}
+          </div>
+          <div class="tc-info">
+            <div class="tc-name" title="${escapeHtml(t.fileName)}">${escapeHtml(t.fileName)}</div>
+            <div class="tc-meta">
+              <span class="tc-dir-badge ${dirClass}">${dirBadge}</span>
+              <span>•</span>
+              <span>${sizeStr}</span>
+              ${speedStr ? `<span>•</span><span class="tc-speed-pill">${speedStr}</span>` : ''}
+              <span>•</span>
+              <span>${timeStr}</span>
+            </div>
+          </div>
+        </div>
+        <button class="tc-action-btn" onclick="handleTransferItemClick('${escapeHtml(t.fileName)}', '${escapeHtml(t.filePath || '')}')">Open</button>
+      `;
+      container.appendChild(card);
+    });
+  }
+
+  window.handleTransferItemClick = function(fileName, filePath) {
+    if (filePath) {
+      openFileViewer({ name: fileName, path: filePath, size: 0, isDirectory: false });
+    } else {
+      showToast(`Transferred file: ${fileName}`);
+    }
+  };
+
+  window.clearServerTransferHistory = async function() {
+    try {
+      await fetch(apiUrl('/api/transfers/clear'), { method: 'POST', headers: getAuthHeaders() });
+    } catch (e) { }
+    serverTransfersList = [];
+    localStorage.removeItem('cloudssd_recent_activity');
+    renderTransferHistory();
+    showToast('Transfer history cleared');
+  };
+
+  // -------------------------------------------------------------
+  // Download Progress Card Callbacks & System Handlers
+  // -------------------------------------------------------------
+  window.onDownloadProgress = function(fileName, progress, speedMBps, curBytes, totalBytes) {
+    const card = document.getElementById('download-progress-card');
+    if (!card) return;
+    card.style.display = 'block';
+    card.classList.remove('complete');
+
+    const title = document.getElementById('dl-file-name');
+    if (title) title.textContent = fileName;
+
+    const stats = document.getElementById('dl-stats');
+    if (stats) {
+      const speedStr = (typeof speedMBps === 'number' && speedMBps > 0) ? ` • ⚡ ${speedMBps.toFixed(1)} MB/s` : '';
+      const sizeStr = (curBytes && totalBytes && totalBytes > 0) ? ` (${formatSize(curBytes)} / ${formatSize(totalBytes)})` : (curBytes ? ` (${formatSize(curBytes)})` : '');
+      const pctStr = progress >= 0 ? `${progress}%` : 'Downloading';
+      stats.textContent = `${pctStr}${speedStr}${sizeStr}`;
+    }
+
+    const bar = document.getElementById('dl-progress-bar');
+    if (bar) {
+      bar.style.width = (progress >= 0 ? Math.max(0, Math.min(100, progress)) : 45) + '%';
+    }
+  };
+
+  window.onDownloadComplete = function(fileName, totalBytes) {
+    const card = document.getElementById('download-progress-card');
+    if (card) {
+      card.classList.add('complete');
+      const stats = document.getElementById('dl-stats');
+      const sizeStr = totalBytes ? ` (${formatSize(totalBytes)})` : '';
+      if (stats) stats.textContent = `✓ Download Complete${sizeStr} • Saved to Downloads`;
+      const bar = document.getElementById('dl-progress-bar');
+      if (bar) bar.style.width = '100%';
+      setTimeout(() => {
+        card.style.display = 'none';
+        card.classList.remove('complete');
+      }, 3500);
+    }
+    fetchTransferHistory(true);
+    refreshRecentFiles();
+  };
+
+  window.onDownloadError = function(fileName, err) {
+    const card = document.getElementById('download-progress-card');
+    if (card) {
+      const stats = document.getElementById('dl-stats');
+      if (stats) stats.textContent = `⚠ Download Error: ${err}`;
+      setTimeout(() => {
+        card.style.display = 'none';
+      }, 4000);
+    }
+  };
+
+  window.dismissDownloadCard = function() {
+    const card = document.getElementById('download-progress-card');
+    if (card) card.style.display = 'none';
+  };
+
+  // -------------------------------------------------------------
+  // Synchronized Transfer History Management
+  // -------------------------------------------------------------
+  let serverTransfersList = [];
+  let currentTransferFilter = 'all';
+
+  window.fetchTransferHistory = async function(force) {
+    const container = document.getElementById('share-transfers-container');
+    if (!container) return;
+
+    try {
+      const res = await fetch(apiUrl('/api/transfers'), { headers: getAuthHeaders() });
+      if (res.ok) {
+        serverTransfersList = await res.json();
+      }
+    } catch (e) {
+      // Fallback
+    }
+
+    renderTransferHistory();
+  };
+
+  window.filterShareHistory = function(filterKey) {
+    currentTransferFilter = filterKey;
+    document.querySelectorAll('.transfer-chip').forEach(c => {
+      c.classList.toggle('active', c.id === `chip-filter-${filterKey}`);
+    });
+    renderTransferHistory();
+  };
+
+  function renderTransferHistory() {
+    const container = document.getElementById('share-transfers-container');
+    if (!container) return;
+
+    const countEl = document.getElementById('share-history-count');
+    if (countEl) countEl.textContent = serverTransfersList.length;
+
+    let items = serverTransfersList;
+    if (currentTransferFilter === 'received') {
+      items = items.filter(t => t.direction === 'upload');
+    } else if (currentTransferFilter === 'sent') {
+      items = items.filter(t => t.direction === 'download');
+    } else if (currentTransferFilter === 'stream') {
+      items = items.filter(t => t.direction === 'stream');
+    }
+
+    if (!items || items.length === 0) {
+      container.innerHTML = '<div class="empty-state-text">No transfers matching this filter. Send or download files to see history.</div>';
+      return;
+    }
+
+    container.innerHTML = '';
+    items.forEach(t => {
+      const card = document.createElement('div');
+      card.className = 'transfer-card-item';
+
+      let dirBadge = '↓ Received';
+      let dirClass = 'received';
+      let iconColor = 'rgba(52, 168, 83, 0.18)';
+      let textColor = '#6DD58C';
+      if (t.direction === 'download') {
+        dirBadge = '↑ Sent';
+        dirClass = 'sent';
+        iconColor = 'rgba(66, 133, 244, 0.18)';
+        textColor = '#A8C7FA';
+      } else if (t.direction === 'stream') {
+        dirBadge = '► Streamed';
+        dirClass = 'stream';
+        iconColor = 'rgba(168, 85, 247, 0.18)';
+        textColor = '#D8B4FE';
+      }
+
+      const fileIcon = getIconForFileName(t.fileName);
+      const timeStr = t.timestamp ? new Date(t.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+      const speedStr = (t.speedMBps && t.speedMBps > 0) ? `⚡ ${t.speedMBps.toFixed(1)} MB/s` : '';
+      const sizeStr = t.sizeFormatted || formatSize(t.bytes || 0);
+
+      card.innerHTML = `
+        <div class="tc-left">
+          <div class="tc-icon-wrap" style="background: ${iconColor}; color: ${textColor};">
+            ${fileIcon}
+          </div>
+          <div class="tc-info">
+            <div class="tc-name" title="${escapeHtml(t.fileName)}">${escapeHtml(t.fileName)}</div>
+            <div class="tc-meta">
+              <span class="tc-dir-badge ${dirClass}">${dirBadge}</span>
+              <span>•</span>
+              <span>${sizeStr}</span>
+              ${speedStr ? `<span>•</span><span class="tc-speed-pill">${speedStr}</span>` : ''}
+              <span>•</span>
+              <span>${timeStr}</span>
+            </div>
+          </div>
+        </div>
+        <button class="tc-action-btn" onclick="handleTransferItemClick('${escapeHtml(t.fileName)}', '${escapeHtml(t.filePath || '')}')">Open</button>
+      `;
+      container.appendChild(card);
+    });
+  }
+
+  window.handleTransferItemClick = function(fileName, filePath) {
+    if (filePath) {
+      openFileViewer({ name: fileName, path: filePath, size: 0, isDirectory: false });
+    } else {
+      showToast(`Transferred file: ${fileName}`);
+    }
+  };
+
+  window.clearServerTransferHistory = async function() {
+    try {
+      await fetch(apiUrl('/api/transfers/clear'), { method: 'POST', headers: getAuthHeaders() });
+    } catch (e) { }
+    serverTransfersList = [];
+    localStorage.removeItem('cloudssd_recent_activity');
+    renderTransferHistory();
+    showToast('Transfer history cleared');
   };
 
   // -------------------------------------------------------------
@@ -1273,10 +1970,12 @@
   document.addEventListener('DOMContentLoaded', async () => {
     switchTab('browse');
     applyViewLayout();
+    updatePhoneSystemMetrics();
     await probeServerUrls();
     pollStatus();
     statusPollTimer = setInterval(pollStatus, 4000);
     hudPollTimer = setInterval(pollGamingHud, 2500);
+    setInterval(updatePhoneSystemMetrics, 10000);
   });
 
 })();

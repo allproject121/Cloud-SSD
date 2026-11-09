@@ -46,7 +46,7 @@
                 <Border Style="{StaticResource Card}">
                     <StackPanel>
                         <TextBlock Text="Startup and security" Style="{StaticResource H2}" />
-                        <CheckBox Content="Restore drives when Cloud-SSD starts" IsChecked="{Binding RestoreMounts}" />
+                        <CheckBox Content="Restore drives when Cloud Drive starts" IsChecked="{Binding RestoreMounts}" />
                         <CheckBox Content="Keep drives mounted after closing (default answer)" IsChecked="{Binding KeepMounts}" />
                         <CheckBox Content="Encrypt the rclone config (key protected with Windows DPAPI)" IsChecked="{Binding EncryptConfig}" />
                         <TextBlock Text="LOCAL GAMES FOLDER (Hybrid and Full Local modes)" Style="{StaticResource Label}" Margin="0,12,0,4" />
@@ -71,7 +71,7 @@
                         <TextBox Text="{Binding ChunkStreams, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource Field}" />
                         <TextBlock Text="--vfs-write-back (seconds after close before upload)" Style="{StaticResource Label}" />
                         <TextBox Text="{Binding WriteBackSeconds, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource Field}" />
-                        <TextBlock Style="{StaticResource Caption}" Text="Measured on this PC: with rclone's default 16 MiB buffer, three 64 KiB random reads downloaded tens of MiB; with 0 they downloaded 256 KiB. Cloud-SSD defaults to 0 and lets the prediction engine decide what to read ahead." />
+                        <TextBlock Style="{StaticResource Caption}" Text="Measured on this PC: with rclone's default 16 MiB buffer, three 64 KiB random reads downloaded tens of MiB; with 0 they downloaded 256 KiB. Cloud Drive defaults to 0 and lets the prediction engine decide what to read ahead." />
                     </StackPanel>
                 </Border>
             </UniformGrid>

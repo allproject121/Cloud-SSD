@@ -136,3 +136,24 @@ Poore project aur compiled binary files ki gehri jaanch ki gayi:
   - Direct download cards for Windows Setup EXE and Android APK.
   - Real-world benchmark comparison tables and quick start guide.
 - **Output**: Polished GitHub homepage committed and synced to remote repository.
+
+### [Step 3.00] - 2026-11-09 17:03:00 IST
+- **Task**: Full Codebase Sync, Fresh Inno Setup Binary Compilation & Release Deployment
+- **Status**: COMPLETED
+- **Detailed Key Changes**:
+  1. **Mobile Companion Client Overhaul (Cloud-SSD-Mobile.apk)**:
+     - Upgraded to 1.16 MB package with glassmorphism dark theme.
+     - Implemented bidirectional JSON-RPC bridge in MainActivity.java with local phone storage access.
+     - Added 100% Offline Game Save Vault for Android internal storage backup.
+     - Added real-time remote PC telemetry HUD and one-tap remote game launching.
+  2. **Desktop Embedded Mobile Bridge Service (LocalMobileBridgeService.cs)**:
+     - Embedded local HTTP REST & WebSocket streaming server running directly on PC.
+     - Added dynamic QR-code generator (MobileHubViewModel.cs) for zero-config Wi-Fi pairing.
+     - Embedded direct APK download server (http://<PC-IP>:8080/cloudssd.apk).
+  3. **Mount & Drive Latency Tuning (MountPlanning.cs, MountService.cs)**:
+     - Refined rclone VFS parameter flags for minimal read latency on random access games.
+     - Added graceful re-attach and sleep/wake probe checks.
+  4. **Fresh Installer Packaging (Inno Setup 6)**:
+     - Recompiled self-contained .NET 10 x64 win-x64 binary with Inno Setup 6.
+     - Generated eleases/Cloud-SSD-0.7.0-setup.exe (68.7 MB, SHA256: e699783c07810e15d96fe9b054b21218a8cf163332dc0fb9db54e1d7bd70d579).
+     - Bundled genuine signed WinFsp 2.1 driver installer.

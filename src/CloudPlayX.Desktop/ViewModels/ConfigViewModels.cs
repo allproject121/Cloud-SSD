@@ -99,7 +99,7 @@ public sealed partial class SmartCacheViewModel : PageViewModel
     private void ChooseLocation()
     {
         var d = new OpenFolderDialog { Title = "Choose a folder on an NTFS drive for the Cloud Drive cache", InitialDirectory = CacheRoot };
-        if (d.ShowDialog() == true) CacheRoot = Path.Combine(d.FolderName, d.FolderName.EndsWith("Cloud-SSD-cache", StringComparison.OrdinalIgnoreCase) ? "" : "Cloud-SSD-cache");
+        if (d.ShowDialog() == true) CacheRoot = Path.Combine(d.FolderName, d.FolderName.EndsWith("Cloud Drive-cache", StringComparison.OrdinalIgnoreCase) ? "" : "Cloud Drive-cache");
     }
 
     [RelayCommand]

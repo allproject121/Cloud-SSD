@@ -77,28 +77,43 @@ public static class MountFlagBuilder
         if (i.Cache.MinFreeSpaceBytes > 0) Flag("vfs-cache-min-free-space", ByteSize.ToRclone(i.Cache.MinFreeSpaceBytes));
         Flag("vfs-cache-max-age", Dur(i.Cache.MaxAge));
         Flag("vfs-cache-poll-interval", Dur(i.Cache.PollInterval));
-        Flag("buffer-size", ByteSize.ToRclone(i.Cache.BufferSizeBytes));
-        Flag("vfs-read-ahead", ByteSize.ToRclone(i.Cache.ReadAheadBytes));
-        Flag("vfs-read-chunk-size", ByteSize.ToRclone(i.Cache.ReadChunkSizeBytes));
-        if (i.Cache.ReadChunkStreams > 0) Flag("vfs-read-chunk-streams", i.Cache.ReadChunkStreams.ToString(CultureInfo.InvariantCulture));
+        Flag("buffer-size", ByteSize.ToRclone(i.Cache.BufferSizeBytes > 0 ? i.Cache.BufferSizeBytes : 32 * ByteSize.MiB));
+        Flag("vfs-read-ahead", ByteSize.ToRclone(i.Cache.ReadAheadBytes > 0 ? i.Cache.ReadAheadBytes : 16 * ByteSize.MiB));
+        Flag("vfs-read-chunk-size", ByteSize.ToRclone(i.Cache.ReadChunkSizeBytes > 0 ? i.Cache.ReadChunkSizeBytes : 8 * ByteSize.MiB));
+        var chunkStreams = i.Cache.ReadChunkStreams > 0 ? i.Cache.ReadChunkStreams : 1;
+        if (chunkStreams > 1) Flag("vfs-read-chunk-streams", chunkStreams.ToString(CultureInfo.InvariantCulture));
         Flag("vfs-write-back", Dur(i.Cache.WriteBack));
         Flag("dir-cache-time", "72h");
         Flag("attr-timeout", "24h");
-        Flag("poll-interval", "15s");
+        Flag("poll-interval", "1m");
         Flag("vfs-fast-fingerprint");
         Flag("vfs-handle-caching", "30s");
+        Flag("vfs-disk-space-total-size", "15T");
+        Flag("vfs-refresh");
         Flag("vfs-read-chunk-size-limit", "256Mi");
+        Flag("no-checksum");
+        Flag("filter", "- desktop.ini");
+        Flag("filter", "- folder.jpg");
+        Flag("filter", "- folder.gif");
+        Flag("filter", "- Thumbs.db");
+        Flag("filter", "- AlbumArt*");
         // Executables need the execute bit in the WinFsp ACL mapping; default 0666 makes CreateProcess fail with
         // "Access is denied" (verified on rclone 1.75.2 / WinFsp 2025).
         Flag("file-perms", "0777");
         Flag("dir-perms", "0777");
-        Flag("volname", Sanitize($"Cloud-SSD {i.Mount.DisplayName}"));
+        Flag("volname", Sanitize($"Cloud Drive {i.Mount.DisplayName}"));
         if (i.Mount.ReadOnly) Flag("read-only");
+
+        // Google Drive pacer safety and Windows encoding compatibility
+        Flag("drive-pacer-min-sleep", "100ms");
+        Flag("drive-pacer-burst", "10");
+        Flag("drive-acknowledge-abuse");
+        Flag("drive-encoding", "Slash,LtGt,DoubleQuote,Colon,Question,Asterisk,Pipe,BackSlash,Del,Ctl,RightSpace,RightPeriod,InvalidUtf8,Dot");
 
         if (i.Network.HardLimitMbps > 0)
             Flag("bwlimit", ((long)Bandwidth.MbpsToBytesPerSecond(i.Network.HardLimitMbps)).ToString(CultureInfo.InvariantCulture) + "B");
-        if (i.Network.TpsLimit > 0 && i.RemoteType is "drive" or null)
-            Flag("tpslimit", i.Network.TpsLimit.ToString(CultureInfo.InvariantCulture));
+        var tps = i.Network.TpsLimit > 0 ? i.Network.TpsLimit : 10;
+        Flag("tpslimit", tps.ToString(CultureInfo.InvariantCulture));
 
         Flag("rc");
         Flag("rc-addr", $"127.0.0.1:{i.RcPort}");

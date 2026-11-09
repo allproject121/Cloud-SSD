@@ -5,7 +5,7 @@
     <StackPanel Margin="26,22">
         <TextBlock Text="Add a game from a cloud drive" Style="{StaticResource H1}" />
         <TextBlock Style="{StaticResource Caption}" Margin="0,0,0,16"
-                   Text="Pick the folder that contains an installed game (the folder with its .exe). Cloud-SSD scans the folder listing and executable headers only — it does not download the game." />
+                   Text="Pick the folder that contains an installed game (the folder with its .exe). Cloud Drive scans the folder listing and executable headers only — it does not download the game." />
         <TextBlock Text="DRIVE" Style="{StaticResource Label}" />
         <ComboBox x:Name="DriveBox" Margin="0,0,0,12" DisplayMemberPath="Label" />
         <TextBlock Text="GAME FOLDER" Style="{StaticResource Label}" />

@@ -17,52 +17,91 @@ public partial class App : Application
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
-        _single = new Mutex(true, @"Local\CloudSSD.Desktop.SingleInstance", out var created);
-        if (!created)
-        {
-            MessageBox.Show("Cloud-SSD is already running.", "Cloud-SSD", MessageBoxButton.OK, MessageBoxImage.Information);
-            Shutdown();
-            return;
-        }
-
-        _host = AppHost.Create();
-        if (!_host.TryAcquireInstanceLock())
-        {
-            MessageBox.Show("Another Cloud-SSD process (for example the command-line tool) is using the data folder.", "Cloud-SSD");
-            Shutdown();
-            return;
-        }
-        DispatcherUnhandledException += (_, args) =>
-        {
-            _host.LoggerFactory.CreateLogger("App").LogError(args.Exception, "Unhandled UI exception");
-            MessageBox.Show(Diagnostics.Redactor.Redact(args.Exception.Message), "Cloud-SSD error", MessageBoxButton.OK, MessageBoxImage.Error);
-            args.Handled = true;
-        };
-        SystemEvents.PowerModeChanged += (_, args) =>
-        {
-            if (args.Mode == PowerModes.Resume && _host != null) _ = _host.Mounts.OnSystemResumeAsync();
-        };
-
-        var vm = new MainViewModel(_host);
-        var window = new MainWindow { DataContext = vm };
-        MainWindow = window;
-        window.Closing += OnClosing;
-        window.Show();
-
+        var dbgLog = @"C:\Users\rosha\AppData\Local\Cloud-SSD\startup_debug.txt";
         try
         {
-            await _host.InitializeAsync();
+            System.IO.File.AppendAllText(dbgLog, $"[{DateTime.Now:O}] OnStartup entered\n");
+            bool hasOwnership = false;
+            try
+            {
+                _single = new Mutex(true, @"Local\CloudSSD.Desktop.SingleInstance", out var created);
+                hasOwnership = created;
+                if (!hasOwnership)
+                {
+                    hasOwnership = _single.WaitOne(TimeSpan.FromMilliseconds(500), false);
+                }
+            }
+            catch (AbandonedMutexException)
+            {
+                hasOwnership = true;
+            }
+            catch (Exception ex)
+            {
+                System.IO.File.AppendAllText(dbgLog, $"[{DateTime.Now:O}] Mutex exception: {ex}\n");
+                hasOwnership = true;
+            }
+
+            System.IO.File.AppendAllText(dbgLog, $"[{DateTime.Now:O}] hasOwnership={hasOwnership}\n");
+            if (!hasOwnership)
+            {
+                System.IO.File.AppendAllText(dbgLog, $"[{DateTime.Now:O}] Exiting: already running\n");
+                MessageBox.Show("Cloud Drive is already running.", "Cloud Drive", MessageBoxButton.OK, MessageBoxImage.Information);
+                Shutdown();
+                return;
+            }
+
+            _host = AppHost.Create();
+            var lockAcquired = _host.TryAcquireInstanceLock();
+            System.IO.File.AppendAllText(dbgLog, $"[{DateTime.Now:O}] lockAcquired={lockAcquired}\n");
+            if (!lockAcquired)
+            {
+                System.IO.File.AppendAllText(dbgLog, $"[{DateTime.Now:O}] Exiting: lock not acquired\n");
+                MessageBox.Show("Another Cloud Drive process (for example the command-line tool) is using the data folder.", "Cloud Drive");
+                Shutdown();
+                return;
+            }
+            DispatcherUnhandledException += (_, args) =>
+            {
+                System.IO.File.AppendAllText(dbgLog, $"[{DateTime.Now:O}] DispatcherUnhandledException: {args.Exception}\n");
+                _host.LoggerFactory.CreateLogger("App").LogError(args.Exception, "Unhandled UI exception");
+                MessageBox.Show(Diagnostics.Redactor.Redact(args.Exception.Message), "Cloud Drive error", MessageBoxButton.OK, MessageBoxImage.Error);
+                args.Handled = true;
+            };
+            SystemEvents.PowerModeChanged += (_, args) =>
+            {
+                if (args.Mode == PowerModes.Resume && _host != null) _ = _host.Mounts.OnSystemResumeAsync();
+            };
+
+            var vm = new MainViewModel(_host);
+            var window = new MainWindow { DataContext = vm };
+            MainWindow = window;
+            window.Closing += OnClosing;
+            window.Show();
+            System.IO.File.AppendAllText(dbgLog, $"[{DateTime.Now:O}] Window shown\n");
+
+            try
+            {
+                await _host.InitializeAsync();
+                System.IO.File.AppendAllText(dbgLog, $"[{DateTime.Now:O}] Host initialized\n");
+            }
+            catch (Exception ex)
+            {
+                System.IO.File.AppendAllText(dbgLog, $"[{DateTime.Now:O}] Host init exception: {ex}\n");
+                MessageBox.Show(window, "Startup problem: " + Diagnostics.Redactor.Redact(ex.Message), "Cloud Drive", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+            if (!_host.Settings.FirstRunCompleted)
+            {
+                var first = new FirstRunWindow(_host) { Owner = window };
+                first.ShowDialog();
+            }
+            vm.Selected.OnShown();
+            System.IO.File.AppendAllText(dbgLog, $"[{DateTime.Now:O}] Startup completed successfully!\n");
         }
         catch (Exception ex)
         {
-            MessageBox.Show(window, "Startup problem: " + Diagnostics.Redactor.Redact(ex.Message), "Cloud-SSD", MessageBoxButton.OK, MessageBoxImage.Warning);
+            System.IO.File.AppendAllText(dbgLog, $"[{DateTime.Now:O}] FATAL STARTUP EXCEPTION: {ex}\n");
+            throw;
         }
-        if (!_host.Settings.FirstRunCompleted)
-        {
-            var first = new FirstRunWindow(_host) { Owner = window };
-            first.ShowDialog();
-        }
-        vm.Selected.OnShown();
     }
 
     private async void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)
@@ -75,14 +114,14 @@ public partial class App : Application
             var running = _host.CurrentLaunch is { State: Games.LaunchState.Running };
             var answer = MessageBox.Show(MainWindow!,
                 (running ? "A game is still running.\n\n" : "") +
-                "Keep the cloud drives mounted after closing Cloud-SSD?\n\nYes: drives stay available and are re-attached next time.\nNo: drives are unmounted (pending uploads get up to 60 s to finish).",
-                "Close Cloud-SSD", MessageBoxButton.YesNoCancel, MessageBoxImage.Question, keep || running ? MessageBoxResult.Yes : MessageBoxResult.No);
+                "Keep the cloud drives mounted after closing Cloud Drive?\n\nYes: drives stay available and are re-attached next time.\nNo: drives are unmounted (pending uploads get up to 60 s to finish).",
+                "Close Cloud Drive", MessageBoxButton.YesNoCancel, MessageBoxImage.Question, keep || running ? MessageBoxResult.Yes : MessageBoxResult.No);
             if (answer == MessageBoxResult.Cancel) return;
             keep = answer == MessageBoxResult.Yes;
         }
         _shuttingDown = true;
         MainWindow!.IsEnabled = false;
-        MainWindow.Title = "Cloud-SSD — closing…";
+        MainWindow.Title = "Cloud Drive — closing…";
         try
         {
             await _host.ShutdownAsync(keep);

@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Media;
+using System.Windows.Data;
 
 namespace CloudPlayX.Desktop;
 
@@ -102,96 +103,126 @@ public static class LocalizationManager
         return english;
     }
 
+    private static bool _isTranslating;
+
     public static void TranslateTree(DependencyObject? root)
     {
-        if (root == null) return;
-
-        if (root is TextBlock tb)
+        if (root == null || _isTranslating) return;
+        try
         {
-            var orig = (string)tb.GetValue(OriginalTextProperty);
-            if (orig == null)
-            {
-                orig = tb.Text;
-                tb.SetValue(OriginalTextProperty, orig);
-            }
-            if (!string.IsNullOrEmpty(orig))
-            {
-                tb.Text = T(orig);
-            }
+            _isTranslating = true;
+            TranslateNode(root, 0);
+        }
+        catch { }
+        finally
+        {
+            _isTranslating = false;
+        }
+    }
 
-            foreach (var inline in tb.Inlines)
+    private static void TranslateNode(DependencyObject? root, int depth)
+    {
+        if (root == null || depth > 30) return;
+
+        try
+        {
+            if (root is TextBlock tb)
             {
-                if (inline is Run r)
+                var binding = BindingOperations.GetBindingExpression(tb, TextBlock.TextProperty);
+                if (binding == null)
                 {
-                    var rOrig = (string)r.GetValue(OriginalTextProperty);
-                    if (rOrig == null)
+                    var orig = (string)tb.GetValue(OriginalTextProperty);
+                    if (orig == null)
                     {
-                        rOrig = r.Text;
-                        r.SetValue(OriginalTextProperty, rOrig);
+                        orig = tb.Text;
+                        tb.SetValue(OriginalTextProperty, orig);
                     }
-                    if (!string.IsNullOrEmpty(rOrig))
+                    if (!string.IsNullOrEmpty(orig))
                     {
-                        r.Text = T(rOrig);
+                        var trans = T(orig);
+                        if (tb.Text != trans) tb.Text = trans;
                     }
                 }
             }
-        }
-        else if (root is Button btn && btn.Content is string btnStr)
-        {
-            var orig = (string)btn.GetValue(OriginalTextProperty);
-            if (orig == null)
+            else if (root is Button btn && btn.Content is string btnStr)
             {
-                orig = btnStr;
-                btn.SetValue(OriginalTextProperty, orig);
+                var binding = BindingOperations.GetBindingExpression(btn, ContentControl.ContentProperty);
+                if (binding == null)
+                {
+                    var orig = (string)btn.GetValue(OriginalTextProperty);
+                    if (orig == null)
+                    {
+                        orig = btnStr;
+                        btn.SetValue(OriginalTextProperty, orig);
+                    }
+                    var trans = T(orig);
+                    if (!Equals(btn.Content, trans)) btn.Content = trans;
+                }
             }
-            btn.Content = T(orig);
-        }
-        else if (root is CheckBox cb && cb.Content is string cbStr)
-        {
-            var orig = (string)cb.GetValue(OriginalTextProperty);
-            if (orig == null)
+            else if (root is CheckBox cb && cb.Content is string cbStr)
             {
-                orig = cbStr;
-                cb.SetValue(OriginalTextProperty, orig);
+                var binding = BindingOperations.GetBindingExpression(cb, ContentControl.ContentProperty);
+                if (binding == null)
+                {
+                    var orig = (string)cb.GetValue(OriginalTextProperty);
+                    if (orig == null)
+                    {
+                        orig = cbStr;
+                        cb.SetValue(OriginalTextProperty, orig);
+                    }
+                    var trans = T(orig);
+                    if (!Equals(cb.Content, trans)) cb.Content = trans;
+                }
             }
-            cb.Content = T(orig);
-        }
-        else if (root is RadioButton rb && rb.Content is string rbStr)
-        {
-            var orig = (string)rb.GetValue(OriginalTextProperty);
-            if (orig == null)
+            else if (root is RadioButton rb && rb.Content is string rbStr)
             {
-                orig = rbStr;
-                rb.SetValue(OriginalTextProperty, orig);
+                var binding = BindingOperations.GetBindingExpression(rb, ContentControl.ContentProperty);
+                if (binding == null)
+                {
+                    var orig = (string)rb.GetValue(OriginalTextProperty);
+                    if (orig == null)
+                    {
+                        orig = rbStr;
+                        rb.SetValue(OriginalTextProperty, orig);
+                    }
+                    var trans = T(orig);
+                    if (!Equals(rb.Content, trans)) rb.Content = trans;
+                }
             }
-            rb.Content = T(orig);
-        }
-        else if (root is Label lbl && lbl.Content is string lblStr)
-        {
-            var orig = (string)lbl.GetValue(OriginalTextProperty);
-            if (orig == null)
+            else if (root is Label lbl && lbl.Content is string lblStr)
             {
-                orig = lblStr;
-                lbl.SetValue(OriginalTextProperty, orig);
+                var binding = BindingOperations.GetBindingExpression(lbl, ContentControl.ContentProperty);
+                if (binding == null)
+                {
+                    var orig = (string)lbl.GetValue(OriginalTextProperty);
+                    if (orig == null)
+                    {
+                        orig = lblStr;
+                        lbl.SetValue(OriginalTextProperty, orig);
+                    }
+                    var trans = T(orig);
+                    if (!Equals(lbl.Content, trans)) lbl.Content = trans;
+                }
             }
-            lbl.Content = T(orig);
-        }
-        else if (root is HeaderedContentControl hcc && hcc.Header is string hStr)
-        {
-            var orig = (string)hcc.GetValue(OriginalTextProperty);
-            if (orig == null)
+            else if (root is HeaderedContentControl hcc && hcc.Header is string hStr)
             {
-                orig = hStr;
-                hcc.SetValue(OriginalTextProperty, orig);
+                var orig = (string)hcc.GetValue(OriginalTextProperty);
+                if (orig == null)
+                {
+                    orig = hStr;
+                    hcc.SetValue(OriginalTextProperty, orig);
+                }
+                var trans = T(orig);
+                if (!Equals(hcc.Header, trans)) hcc.Header = trans;
             }
-            hcc.Header = T(orig);
-        }
 
-        int count = VisualTreeHelper.GetChildrenCount(root);
-        for (int i = 0; i < count; i++)
-        {
-            TranslateTree(VisualTreeHelper.GetChild(root, i));
+            int count = VisualTreeHelper.GetChildrenCount(root);
+            for (int i = 0; i < count; i++)
+            {
+                TranslateNode(VisualTreeHelper.GetChild(root, i), depth + 1);
+            }
         }
+        catch { }
     }
 
     private static readonly Dictionary<string, Dictionary<string, string>> Translations = new()
@@ -202,6 +233,8 @@ public static class LocalizationManager
             ["Dashboard"] = "Dashboard (Home)",
             ["Cloud Drives"] = "Cloud Drives (Storage)",
             ["Game Library"] = "Game Library (Games)",
+            ["Phone (Mobile Hub)"] = "Phone / Mobile",
+            ["Mobile Hub"] = "Phone / Mobile",
             ["Accelerator"] = "Speed Booster",
             ["Smart Cache"] = "Smart SSD Cache",
             ["Performance"] = "Live Performance",
@@ -305,6 +338,8 @@ public static class LocalizationManager
             ["Dashboard"] = "डैशबोर्ड",
             ["Cloud Drives"] = "क्लाउड ड्राइव्स",
             ["Game Library"] = "गेम लाइब्रेरी",
+            ["Phone (Mobile Hub)"] = "फ़ोन (मोबाइल हब)",
+            ["Mobile Hub"] = "फ़ोन (मोबाइल हब)",
             ["Accelerator"] = "स्पीड बूस्टर",
             ["Smart Cache"] = "स्मार्ट एसएसडी कैश",
             ["Performance"] = "लाइव परफॉरमेंस",

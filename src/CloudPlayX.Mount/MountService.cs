@@ -218,6 +218,19 @@ public sealed class RcloneMountService : IAsyncDisposable
                 s.FailedPings = 0;
                 Persist();
                 Publish(s, $"Mounted at {s.DriveLetter}:");
+                // Pre-populate VFS directory tree recursively in RAM so folder browsing is 0 ms
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await Task.Delay(1000);
+                        if (s.Rc != null)
+                        {
+                            await s.Rc.CallAsync("vfs/refresh", new Dictionary<string, object> { ["recursive"] = "true" });
+                        }
+                    }
+                    catch { }
+                });
                 return;
             }
             await Task.Delay(250, ct);

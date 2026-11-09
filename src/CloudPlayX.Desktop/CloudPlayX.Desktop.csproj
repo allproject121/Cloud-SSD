@@ -5,7 +5,10 @@
     <UseWPF>true</UseWPF>
     <AssemblyName>Cloud-SSD</AssemblyName>
     <RootNamespace>CloudPlayX.Desktop</RootNamespace>
-    <ApplicationIcon>Assets\cloudplayx.ico</ApplicationIcon>
+    <Product>Cloud Drive</Product>
+    <Title>Cloud Drive</Title>
+    <Description>Cloud Drive - High-Speed Cloud-to-SSD Virtual Drive Engine</Description>
+    <ApplicationIcon>Assets\clouddrive.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
   <ItemGroup>

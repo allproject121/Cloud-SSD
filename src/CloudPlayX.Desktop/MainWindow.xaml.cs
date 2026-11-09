@@ -14,8 +14,6 @@ public partial class MainWindow : Window
         CmbLanguage.ItemsSource = LocalizationManager.SupportedLanguages;
         CmbLanguage.SelectedItem = LocalizationManager.CurrentLanguage;
         _initializing = false;
-
-        Loaded += (_, _) => LocalizationManager.TranslateTree(this);
     }
 
     private void OnLanguageSelectionChanged(object sender, SelectionChangedEventArgs e)

@@ -58,7 +58,7 @@
                     <Border Style="{StaticResource Card}">
                         <StackPanel>
                             <TextBlock Text="Eviction and safety" Style="{StaticResource H2}" />
-                            <TextBlock Style="{StaticResource Caption}" Text="Eviction is done by rclone: least-recently-used files are removed when the budget or the protected free space is exceeded, and data unused for the maximum age expires. Only cached copies are ever removed — never cloud originals, never files outside the Cloud-SSD cache folder, never save games." />
+                            <TextBlock Style="{StaticResource Caption}" Text="Eviction is done by rclone: least-recently-used files are removed when the budget or the protected free space is exceeded, and data unused for the maximum age expires. Only cached copies are ever removed — never cloud originals, never files outside the Cloud Drive cache folder, never save games." />
                             <ItemsControl ItemsSource="{Binding Warnings}" Margin="0,8,0,0">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate><TextBlock Text="{Binding}" Foreground="{StaticResource Warning}" TextWrapping="Wrap" Margin="0,0,0,6" FontSize="12" /></DataTemplate>

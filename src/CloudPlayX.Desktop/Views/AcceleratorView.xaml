@@ -52,7 +52,7 @@
                                             <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Width="90" />
                                             <TextBlock Text="{Binding State}" Foreground="{Binding Tone, Converter={StaticResource Tone}}" FontSize="12" />
                                         </StackPanel>
-                                        <TextBlock Style="{StaticResource Caption}"><Run Text="issued " /><Run Text="{Binding Issued}" /><Run Text=" · useful " /><Run Text="{Binding Useful}" /><Run Text=" · wasted " /><Run Text="{Binding Wasted}" /><Run Text=" · accuracy " /><Run Text="{Binding Accuracy}" /></TextBlock>
+                                        <TextBlock Style="{StaticResource Caption}"><Run Text="issued " /><Run Text="{Binding Issued, Mode=OneWay}" /><Run Text=" · useful " /><Run Text="{Binding Useful, Mode=OneWay}" /><Run Text=" · wasted " /><Run Text="{Binding Wasted, Mode=OneWay}" /><Run Text=" · accuracy " /><Run Text="{Binding Accuracy, Mode=OneWay}" /></TextBlock>
                                     </StackPanel>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
@@ -86,7 +86,7 @@
                     </StackPanel>
                 </Border>
             </Grid>
-            <TextBlock Style="{StaticResource Caption}" Text="Hits and misses are rclone's own cache verdict for each read; wait times are measured between the read request and its completion. Prefetch reads by Cloud-SSD are excluded from these figures." />
+            <TextBlock Style="{StaticResource Caption}" Text="Hits and misses are rclone's own cache verdict for each read; wait times are measured between the read request and its completion. Prefetch reads by Cloud Drive are excluded from these figures." />
         </StackPanel>
     </ScrollViewer>
 </UserControl>

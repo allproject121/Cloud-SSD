@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Globalization;
 using System.Net;
 using System.Net.NetworkInformation;
@@ -35,11 +36,15 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
     private long _lastRateSampleBytes;
     private DateTimeOffset _lastRateSampleTime = DateTimeOffset.UtcNow;
     private double _currentRateMbps;
+    private readonly List<TransferRecord> _transferHistory = new();
+    private readonly object _historyLock = new();
+    private string HistoryFilePath => Path.Combine(_host.Paths.DataRoot, "transfer_history.json");
 
     public LocalMobileBridgeService(AppHost host, ILogger<LocalMobileBridgeService> log)
     {
         _host = host;
         _log = log;
+        LoadTransferHistory();
     }
 
     public bool IsRunning => _listener != null && (_cts != null && !_cts.IsCancellationRequested);
@@ -50,6 +55,7 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
 
     public event Action? StatusChanged;
     public event Action<string, long>? FileTransferred;
+    public event Action<TransferRecord>? TransferRecorded;
 
     public string LocalIpAddress => GetPreferredLocalIp();
 
@@ -346,15 +352,30 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
         }
         else if (path.Equals("/api/stream", StringComparison.OrdinalIgnoreCase))
         {
-            await HandleStreamEndpointAsync(queryParams, headers, stream, ct);
+            await HandleStreamEndpointAsync(queryParams, headers, stream, clientIp, ct);
         }
         else if (path.Equals("/api/download", StringComparison.OrdinalIgnoreCase))
         {
-            await HandleDownloadEndpointAsync(queryParams, stream, ct);
+            await HandleDownloadEndpointAsync(queryParams, stream, clientIp, ct);
         }
         else if (path.Equals("/api/upload", StringComparison.OrdinalIgnoreCase) && method == "POST")
         {
-            await HandleUploadEndpointAsync(queryParams, headers, stream, ct);
+            await HandleUploadEndpointAsync(queryParams, headers, stream, clientIp, ct);
+        }
+        else if (path.Equals("/api/transfers", StringComparison.OrdinalIgnoreCase))
+        {
+            if (method == "POST" && (queryParams.GetValueOrDefault("action") == "clear" || path.EndsWith("/clear", StringComparison.OrdinalIgnoreCase)))
+            {
+                await HandleTransfersClearEndpointAsync(stream, ct);
+            }
+            else
+            {
+                await HandleTransfersEndpointAsync(stream, ct);
+            }
+        }
+        else if (path.Equals("/api/transfers/clear", StringComparison.OrdinalIgnoreCase))
+        {
+            await HandleTransfersClearEndpointAsync(stream, ct);
         }
         else if (path.Equals("/api/saves", StringComparison.OrdinalIgnoreCase))
         {
@@ -367,6 +388,14 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
         else if (path.Equals("/api/clean", StringComparison.OrdinalIgnoreCase))
         {
             await HandleCleanEndpointAsync(stream, ct);
+        }
+        else if (path.Equals("/api/open-pc", StringComparison.OrdinalIgnoreCase))
+        {
+            await HandleOpenPcEndpointAsync(queryParams, stream, ct);
+        }
+        else if (path.Equals("/api/preview", StringComparison.OrdinalIgnoreCase))
+        {
+            await HandlePreviewEndpointAsync(queryParams, stream, ct);
         }
         else
         {
@@ -574,7 +603,14 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
         // If path is empty, default to mounted drive Z:\, active session, or Cloud-SSD Uploads folder
         if (string.IsNullOrEmpty(targetPath))
         {
-            if (Directory.Exists(@"Z:\"))
+            string uploadsDir = _host.Settings.MobileBridge.UploadDirectory 
+                ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "Cloud-SSD_Uploads");
+
+            if ((category == "downloads" || category == "uploads") && Directory.Exists(uploadsDir))
+            {
+                targetPath = uploadsDir;
+            }
+            else if (Directory.Exists(@"Z:\"))
             {
                 targetPath = @"Z:\";
             }
@@ -585,7 +621,6 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
                 
                 if (string.IsNullOrEmpty(targetPath) || !Directory.Exists(targetPath))
                 {
-                    string uploadsDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "Cloud-SSD_Uploads");
                     targetPath = Directory.Exists(uploadsDir) 
                         ? uploadsDir 
                         : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
@@ -637,6 +672,7 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
                             "documents" or "docs" => isDoc,
                             "apps" or "archives" => isApp,
                             "saves" => isSave,
+                            "downloads" or "uploads" => true,
                             _ => true
                         };
                     }
@@ -744,6 +780,7 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
         Dictionary<string, string> queryParams,
         Dictionary<string, string> headers,
         NetworkStream stream,
+        string clientIp,
         CancellationToken ct)
     {
         string? filePath = queryParams.GetValueOrDefault("path");
@@ -805,6 +842,7 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
         byte[] buffer = new byte[bufferSize];
         long remaining = chunkLength;
 
+        var sw = Stopwatch.StartNew();
         using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, bufferSize, useAsync: true);
         fs.Seek(start, SeekOrigin.Begin);
 
@@ -818,11 +856,30 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
             remaining -= read;
             TrackBytes(read);
         }
+        sw.Stop();
 
-        FileTransferred?.Invoke(fileInfo.Name, chunkLength - remaining);
+        long transferred = chunkLength - remaining;
+        if (transferred > 0)
+        {
+            double elapsed = Math.Max(0.01, sw.Elapsed.TotalSeconds);
+            double speedMBps = (transferred / (1024.0 * 1024.0)) / elapsed;
+            string devName = ResolveDeviceName(clientIp);
+
+            FileTransferred?.Invoke(fileInfo.Name, transferred);
+
+            // Record streaming transfer (if initial start or substantial chunk)
+            if (start == 0 || transferred > 1024 * 1024)
+            {
+                RecordTransfer(fileInfo.Name, fileInfo.FullName, transferred, "stream", devName, clientIp, speedMBps, remaining == 0 ? "Completed" : "Interrupted");
+            }
+        }
     }
 
-    private async Task HandleDownloadEndpointAsync(Dictionary<string, string> queryParams, NetworkStream stream, CancellationToken ct)
+    private async Task HandleDownloadEndpointAsync(
+        Dictionary<string, string> queryParams,
+        NetworkStream stream,
+        string clientIp,
+        CancellationToken ct)
     {
         string? filePath = queryParams.GetValueOrDefault("path");
         if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
@@ -841,6 +898,8 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
         headerSb.Append($"Content-Length: {length}\r\n");
         headerSb.Append($"Content-Disposition: attachment; filename=\"{Uri.EscapeDataString(fileInfo.Name)}\"\r\n");
         headerSb.Append("Access-Control-Allow-Origin: *\r\n");
+        headerSb.Append("Access-Control-Allow-Methods: GET, POST, OPTIONS, HEAD\r\n");
+        headerSb.Append("Access-Control-Allow-Headers: *\r\n");
         headerSb.Append("Connection: close\r\n\r\n");
 
         await stream.WriteAsync(Encoding.UTF8.GetBytes(headerSb.ToString()), ct);
@@ -849,6 +908,7 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
         byte[] buffer = new byte[bufferSize];
         long remaining = length;
 
+        var sw = Stopwatch.StartNew();
         using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, bufferSize, useAsync: true);
         while (remaining > 0 && !ct.IsCancellationRequested)
         {
@@ -861,14 +921,22 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
             TrackBytes(read);
         }
         await stream.FlushAsync(ct);
+        sw.Stop();
 
-        FileTransferred?.Invoke(fileInfo.Name, length);
+        long transferred = length - remaining;
+        double elapsed = Math.Max(0.01, sw.Elapsed.TotalSeconds);
+        double speedMBps = (transferred / (1024.0 * 1024.0)) / elapsed;
+        string devName = ResolveDeviceName(clientIp);
+
+        FileTransferred?.Invoke(fileInfo.Name, transferred);
+        RecordTransfer(fileInfo.Name, fileInfo.FullName, transferred, "download", devName, clientIp, speedMBps, remaining == 0 ? "Completed" : "Interrupted");
     }
 
     private async Task HandleUploadEndpointAsync(
         Dictionary<string, string> queryParams,
         Dictionary<string, string> headers,
         NetworkStream stream,
+        string clientIp,
         CancellationToken ct)
     {
         string uploadDir = _host.Settings.MobileBridge.UploadDirectory
@@ -888,6 +956,8 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
         }
 
         long savedSize = 0;
+        var sw = Stopwatch.StartNew();
+
         // Direct stream upload to disk
         if (contentLength > 0)
         {
@@ -913,20 +983,178 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
         }
         else
         {
-            await File.WriteAllBytesAsync(destPath, Array.Empty<byte>(), ct);
+            await using (var destFile = new FileStream(destPath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite, 64 * 1024, useAsync: true))
+            {
+                const int bufferSize = 64 * 1024;
+                byte[] buffer = new byte[bufferSize];
+                int read;
+                while ((read = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), ct)) > 0)
+                {
+                    await destFile.WriteAsync(buffer.AsMemory(0, read), ct);
+                    savedSize += read;
+                    TrackBytes(read);
+                    if (!stream.DataAvailable)
+                    {
+                        await Task.Delay(40, ct);
+                        if (!stream.DataAvailable) break;
+                    }
+                }
+                await destFile.FlushAsync(ct);
+                savedSize = destFile.Length;
+            }
         }
+        sw.Stop();
+
+        double elapsed = Math.Max(0.01, sw.Elapsed.TotalSeconds);
+        double speedMBps = (savedSize / (1024.0 * 1024.0)) / elapsed;
+        string devName = ResolveDeviceName(clientIp);
 
         FileTransferred?.Invoke(filename, savedSize);
+        RecordTransfer(filename, destPath, savedSize, "upload", devName, clientIp, speedMBps, "Completed");
 
         var resp = JsonSerializer.Serialize(new
         {
             success = true,
             filename,
             path = destPath,
-            size = savedSize
+            size = savedSize,
+            speedMBps = Math.Round(speedMBps, 1)
         }, JsonOpts);
 
         await SendResponseAsync(stream, 200, "OK", "application/json; charset=utf-8", Encoding.UTF8.GetBytes(resp), ct);
+    }
+
+    private async Task HandleTransfersEndpointAsync(NetworkStream stream, CancellationToken ct)
+    {
+        var history = GetTransferHistory();
+        var json = JsonSerializer.Serialize(history, JsonOpts);
+        await SendResponseAsync(stream, 200, "OK", "application/json; charset=utf-8", Encoding.UTF8.GetBytes(json), ct);
+    }
+
+    private async Task HandleTransfersClearEndpointAsync(NetworkStream stream, CancellationToken ct)
+    {
+        ClearTransferHistory();
+        var json = JsonSerializer.Serialize(new { success = true, message = "History cleared" }, JsonOpts);
+        await SendResponseAsync(stream, 200, "OK", "application/json; charset=utf-8", Encoding.UTF8.GetBytes(json), ct);
+    }
+
+    private string ResolveDeviceName(string clientIp)
+    {
+        var dev = _host.Settings.MobileBridge.PairedDevices.FirstOrDefault(d => d.IpAddress == clientIp);
+        if (dev != null && !string.IsNullOrEmpty(dev.Name)) return dev.Name;
+        if (IPAddress.TryParse(clientIp, out var ip) && IPAddress.IsLoopback(ip)) return "PC / Localhost";
+        return "Android Phone";
+    }
+
+    private void LoadTransferHistory()
+    {
+        try
+        {
+            string path = HistoryFilePath;
+            if (File.Exists(path))
+            {
+                string json = File.ReadAllText(path, Encoding.UTF8);
+                var list = JsonSerializer.Deserialize<List<TransferRecord>>(json, JsonOpts);
+                if (list != null)
+                {
+                    lock (_historyLock)
+                    {
+                        _transferHistory.Clear();
+                        _transferHistory.AddRange(list);
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _log.LogWarning(ex, "Failed to load transfer history from {Path}", HistoryFilePath);
+        }
+    }
+
+    private void SaveTransferHistory()
+    {
+        try
+        {
+            string path = HistoryFilePath;
+            string? dir = Path.GetDirectoryName(path);
+            if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+
+            List<TransferRecord> copy;
+            lock (_historyLock)
+            {
+                copy = _transferHistory.ToList();
+            }
+            string json = JsonSerializer.Serialize(copy, JsonOpts);
+            File.WriteAllText(path, json, Encoding.UTF8);
+        }
+        catch (Exception ex)
+        {
+            _log.LogWarning(ex, "Failed to save transfer history to {Path}", HistoryFilePath);
+        }
+    }
+
+    public IReadOnlyList<TransferRecord> GetTransferHistory()
+    {
+        lock (_historyLock)
+        {
+            return _transferHistory.ToList();
+        }
+    }
+
+    public void ClearTransferHistory()
+    {
+        lock (_historyLock)
+        {
+            _transferHistory.Clear();
+        }
+        SaveTransferHistory();
+        StatusChanged?.Invoke();
+    }
+
+    public void RecordTransfer(
+        string fileName,
+        string? filePath,
+        long bytes,
+        string direction,
+        string deviceName,
+        string deviceIp,
+        double speedMBps,
+        string status = "Completed")
+    {
+        var record = new TransferRecord
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            FileName = fileName,
+            FilePath = filePath,
+            Bytes = bytes,
+            SizeFormatted = ByteSize.Format(bytes),
+            Direction = direction,
+            DeviceName = string.IsNullOrWhiteSpace(deviceName) ? "Android Phone" : deviceName,
+            DeviceIp = deviceIp ?? "",
+            Timestamp = DateTimeOffset.Now,
+            SpeedMBps = Math.Round(Math.Max(0.1, speedMBps), 1),
+            Status = status
+        };
+
+        lock (_historyLock)
+        {
+            _transferHistory.Insert(0, record);
+            if (_transferHistory.Count > 200)
+            {
+                _transferHistory.RemoveRange(200, _transferHistory.Count - 200);
+            }
+        }
+
+        SaveTransferHistory();
+
+        try
+        {
+            TransferRecorded?.Invoke(record);
+        }
+        catch (Exception ex)
+        {
+            _log.LogWarning(ex, "Error invoking TransferRecorded handler");
+        }
     }
 
     private async Task HandleSavesEndpointAsync(NetworkStream stream, CancellationToken ct)
@@ -1056,15 +1284,108 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
         ".svg" => "image/svg+xml",
         ".png" => "image/png",
         ".jpg" or ".jpeg" => "image/jpeg",
+        ".gif" => "image/gif",
+        ".webp" => "image/webp",
+        ".bmp" => "image/bmp",
         ".ico" => "image/x-icon",
-        ".mp4" => "video/mp4",
+        ".mp4" or ".m4v" => "video/mp4",
         ".webm" => "video/webm",
         ".mkv" => "video/x-matroska",
+        ".avi" => "video/x-msvideo",
+        ".mov" => "video/quicktime",
         ".mp3" => "audio/mpeg",
         ".wav" => "audio/wav",
+        ".ogg" => "audio/ogg",
+        ".flac" => "audio/flac",
+        ".m4a" or ".aac" => "audio/mp4",
+        ".pdf" => "application/pdf",
+        ".txt" or ".log" or ".md" or ".ini" or ".cfg" or ".csv" => "text/plain; charset=utf-8",
+        ".xml" => "application/xml; charset=utf-8",
         ".zip" => "application/zip",
+        ".rar" => "application/vnd.rar",
+        ".7z" => "application/x-7z-compressed",
+        ".apk" => "application/vnd.android.package-archive",
         _ => "application/octet-stream"
     };
+
+    private async Task HandleOpenPcEndpointAsync(
+        Dictionary<string, string> queryParams,
+        NetworkStream stream,
+        CancellationToken ct)
+    {
+        string? filePath = queryParams.GetValueOrDefault("path");
+        if (string.IsNullOrEmpty(filePath) || (!File.Exists(filePath) && !Directory.Exists(filePath)))
+        {
+            var notFound = JsonSerializer.Serialize(new { success = false, error = "File not found" }, JsonOpts);
+            await SendResponseAsync(stream, 404, "Not Found", "application/json; charset=utf-8", Encoding.UTF8.GetBytes(notFound), ct);
+            return;
+        }
+
+        try
+        {
+            Process.Start(new ProcessStartInfo(filePath) { UseShellExecute = true });
+            var ok = JsonSerializer.Serialize(new { success = true, message = $"Opened '{Path.GetFileName(filePath)}' on PC" }, JsonOpts);
+            await SendResponseAsync(stream, 200, "OK", "application/json; charset=utf-8", Encoding.UTF8.GetBytes(ok), ct);
+        }
+        catch (Exception ex)
+        {
+            _log.LogWarning(ex, "Failed to launch file on PC: {Path}", filePath);
+            var err = JsonSerializer.Serialize(new { success = false, error = ex.Message }, JsonOpts);
+            await SendResponseAsync(stream, 500, "Internal Server Error", "application/json; charset=utf-8", Encoding.UTF8.GetBytes(err), ct);
+        }
+    }
+
+    private async Task HandlePreviewEndpointAsync(
+        Dictionary<string, string> queryParams,
+        NetworkStream stream,
+        CancellationToken ct)
+    {
+        string? filePath = queryParams.GetValueOrDefault("path");
+        if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+        {
+            var notFound = JsonSerializer.Serialize(new { success = false, error = "File not found" }, JsonOpts);
+            await SendResponseAsync(stream, 404, "Not Found", "application/json; charset=utf-8", Encoding.UTF8.GetBytes(notFound), ct);
+            return;
+        }
+
+        try
+        {
+            var fi = new FileInfo(filePath);
+            const int maxPreviewBytes = 256 * 1024; // 256 KB max for preview
+            long readLength = Math.Min(fi.Length, maxPreviewBytes);
+
+            byte[] buffer = new byte[readLength];
+            await using (var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            {
+                int bytesRead = await fs.ReadAsync(buffer, 0, (int)readLength, ct);
+                if (bytesRead < readLength)
+                {
+                    Array.Resize(ref buffer, bytesRead);
+                }
+            }
+
+            bool isBinary = buffer.Take(1024).Any(b => b == 0);
+            string previewText = isBinary ? "" : Encoding.UTF8.GetString(buffer);
+
+            var resp = JsonSerializer.Serialize(new
+            {
+                success = true,
+                name = fi.Name,
+                path = filePath,
+                size = fi.Length,
+                isBinary,
+                truncated = fi.Length > maxPreviewBytes,
+                content = previewText
+            }, JsonOpts);
+
+            await SendResponseAsync(stream, 200, "OK", "application/json; charset=utf-8", Encoding.UTF8.GetBytes(resp), ct);
+        }
+        catch (Exception ex)
+        {
+            var err = JsonSerializer.Serialize(new { success = false, error = ex.Message }, JsonOpts);
+            await SendResponseAsync(stream, 500, "Internal Server Error", "application/json; charset=utf-8", Encoding.UTF8.GetBytes(err), ct);
+        }
+    }
 
     private void TrackBytes(int count)
     {
@@ -1128,4 +1449,22 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
         }
         return result;
     }
+}
+
+/// <summary>
+/// Persistent record of a mobile-to-PC or PC-to-mobile file transfer, download or stream.
+/// </summary>
+public sealed class TransferRecord
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString("N");
+    public string FileName { get; set; } = string.Empty;
+    public string? FilePath { get; set; }
+    public long Bytes { get; set; }
+    public string SizeFormatted { get; set; } = string.Empty;
+    public string Direction { get; set; } = "upload"; // "upload" (Phone -> PC), "download" (PC -> Phone), "stream"
+    public string DeviceName { get; set; } = "Android Phone";
+    public string DeviceIp { get; set; } = string.Empty;
+    public DateTimeOffset Timestamp { get; set; } = DateTimeOffset.Now;
+    public double SpeedMBps { get; set; }
+    public string Status { get; set; } = "Completed"; // "Completed", "Interrupted", "Failed"
 }

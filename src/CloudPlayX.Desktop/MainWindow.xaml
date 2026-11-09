@@ -3,9 +3,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:CloudPlayX.Desktop.ViewModels"
         xmlns:v="clr-namespace:CloudPlayX.Desktop.Views"
-        Title="Cloud-SSD" Height="650" Width="1180" MinWidth="850" MinHeight="500"
+        Title="Cloud Drive" Height="650" Width="1180" MinWidth="850" MinHeight="500"
         Background="{StaticResource Bg}" FontFamily="{StaticResource UiFont}" Foreground="{StaticResource Text}"
-        WindowStartupLocation="CenterScreen" Icon="Assets/cloudplayx.ico">
+        WindowStartupLocation="CenterScreen" Icon="Assets/clouddrive.ico">
     <Window.Resources>
         <DataTemplate DataType="{x:Type vm:DashboardViewModel}"><v:DashboardView /></DataTemplate>
         <DataTemplate DataType="{x:Type vm:CloudDrivesViewModel}"><v:CloudDrivesView /></DataTemplate>
@@ -36,9 +36,9 @@
                     </Border>
                     <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
                         <TextBlock FontSize="16" FontWeight="Bold">
-                            <Run Text="CLOUD" /><Run Text="-SSD" Foreground="{StaticResource Purple}" />
+                            <Run Text="CLOUD " /><Run Text="DRIVE" Foreground="{StaticResource Purple}" />
                         </TextBlock>
-                        <TextBlock Text="Cloud-to-SSD virtual drive engine" FontSize="10.5" Foreground="{StaticResource Dim}" />
+                        <TextBlock Text="Cloud Virtual Drive Engine" FontSize="10.5" Foreground="{StaticResource Dim}" />
                     </StackPanel>
                 </StackPanel>
                 <StackPanel DockPanel.Dock="Bottom" Margin="18,0,18,14">

@@ -97,8 +97,8 @@
                                                 <StackPanel VerticalAlignment="Center">
                                                     <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13" />
                                                     <TextBlock FontSize="11" Foreground="{StaticResource Dim}">
-                                                        <Run Text="IP: " /><Run Text="{Binding IpAddress}" />
-                                                        <Run Text=" · Last seen: " /><Run Text="{Binding LastSeenFormatted}" />
+                                                        <Run Text="IP: " /><Run Text="{Binding IpAddress, Mode=OneWay}" />
+                                                        <Run Text=" · Last seen: " /><Run Text="{Binding LastSeenFormatted, Mode=OneWay}" />
                                                     </TextBlock>
                                                 </StackPanel>
                                             </DockPanel>
@@ -113,33 +113,102 @@
 
                             <!-- Access Permissions -->
                             <TextBlock Text="ACCESS PERMISSIONS" Style="{StaticResource Label}" Margin="0,16,0,8" />
-                            <CheckBox Content="Allow Browsing Cloud-SSD Virtual Drives" IsChecked="{Binding AllowDriveBrowsing}" Margin="0,0,0,6" />
+                            <CheckBox Content="Allow Browsing Cloud Drive Virtual Drives" IsChecked="{Binding AllowDriveBrowsing}" Margin="0,0,0,6" />
                             <CheckBox Content="Allow Media Streaming (4K Video &amp; Music)" IsChecked="{Binding AllowStreaming}" Margin="0,0,0,6" />
                             <CheckBox Content="Allow Mobile-to-PC File Uploads" IsChecked="{Binding AllowUploads}" Margin="0,0,0,6" />
                             <CheckBox Content="Enable Live Gaming HUD on Phone Screen" IsChecked="{Binding AllowGamingHud}" />
                         </StackPanel>
                     </Border>
 
-                    <!-- Live Activity Meter -->
+                    <!-- Live Transfer Activity & Full History Panel -->
                     <Border Style="{StaticResource Card}">
                         <StackPanel>
-                            <DockPanel Margin="0,0,0,8">
+                            <DockPanel Margin="0,0,0,10">
                                 <TextBlock DockPanel.Dock="Right" Text="{Binding TransferRateFormatted}" FontWeight="Bold"
                                            FontSize="13" Foreground="{StaticResource Accent}" />
-                                <TextBlock Text="LIVE TRANSFER ACTIVITY" Style="{StaticResource Label}" />
+                                <TextBlock Text="LIVE ACTIVITY &amp; TRANSFER HISTORY" Style="{StaticResource Label}" VerticalAlignment="Center" />
                             </DockPanel>
 
-                            <ItemsControl ItemsSource="{Binding RecentTransfers}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding}" FontSize="11" Foreground="{StaticResource Dim}" Margin="0,2" />
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
+                            <!-- Action Bar: Count, Open Folder, Clear -->
+                            <DockPanel Margin="0,0,0,8" LastChildFill="True">
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                    <Button Content="Uploads Folder" Command="{Binding OpenUploadsFolderCommand}" Padding="8,3" FontSize="11" Margin="0,0,6,0" />
+                                    <Button Content="Clear History" Command="{Binding ClearTransferHistoryCommand}" Padding="8,3" FontSize="11" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="Records:" FontSize="11" Foreground="{StaticResource Dim}" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                    <Border Background="{StaticResource Surface2}" CornerRadius="10" Padding="8,2" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                                        <TextBlock Text="{Binding TotalTransferCount}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource Accent}" />
+                                    </Border>
+                                </StackPanel>
+                            </DockPanel>
 
-                            <TextBlock Text="No active streaming or file transfers right now."
-                                       Style="{StaticResource Caption}" Margin="0,4,0,0"
-                                       Visibility="{Binding RecentTransfers.Count, Converter={StaticResource Vis}, ConverterParameter=invert}" />
+                            <!-- Filter Chips and Search -->
+                            <DockPanel Margin="0,0,0,8" LastChildFill="True">
+                                <TextBox DockPanel.Dock="Right" Width="130" Text="{Binding TransferSearchText, UpdateSourceTrigger=PropertyChanged}"
+                                         FontSize="11" Padding="6,3" ToolTip="Search transfers by name or device" />
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Content="All" Command="{Binding SetFilterCommand}" CommandParameter="All"
+                                            Padding="9,3" FontSize="11" Margin="0,0,4,0" />
+                                    <Button Content="&#x2193; Received" Command="{Binding SetFilterCommand}" CommandParameter="Received"
+                                            Padding="9,3" FontSize="11" Margin="0,0,4,0" />
+                                    <Button Content="&#x2191; Sent" Command="{Binding SetFilterCommand}" CommandParameter="Sent"
+                                            Padding="9,3" FontSize="11" Margin="0,0,4,0" />
+                                    <Button Content="&#x25BA; Stream" Command="{Binding SetFilterCommand}" CommandParameter="Streamed"
+                                            Padding="9,3" FontSize="11" />
+                                </StackPanel>
+                            </DockPanel>
+
+                            <!-- Transfer Items List -->
+                            <ScrollViewer MaxHeight="300" VerticalScrollBarVisibility="Auto">
+                                <ItemsControl ItemsSource="{Binding FilteredTransfers}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="{StaticResource Surface2}" CornerRadius="8" Padding="8,6" Margin="0,0,0,6"
+                                                    BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                                                <DockPanel LastChildFill="True">
+                                                    <!-- Action Buttons on Right -->
+                                                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="6,0,0,0">
+                                                        <Button Content="Open" Command="{Binding OpenFileCommand}" Padding="8,3" FontSize="10.5" Margin="0,0,4,0" ToolTip="Open file with default app" />
+                                                        <Button Content="Folder" Command="{Binding OpenFolderCommand}" Padding="8,3" FontSize="10.5" ToolTip="Show file in Windows Explorer" />
+                                                    </StackPanel>
+
+                                                    <!-- Direction Badge on Left -->
+                                                    <Border DockPanel.Dock="Left" Width="28" Height="28" CornerRadius="6"
+                                                            Background="{StaticResource Bg}" Margin="0,0,8,0"
+                                                            VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding DirectionIcon}" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                                                   FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                                   Foreground="{Binding DirectionTone, Converter={StaticResource Tone}}" />
+                                                    </Border>
+
+                                                    <!-- Details in Middle -->
+                                                    <StackPanel VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" FontSize="12"
+                                                                   TextTrimming="CharacterEllipsis" ToolTip="{Binding FileName}" />
+                                                        <TextBlock FontSize="10.5" Foreground="{StaticResource Dim}" Margin="0,2,0,0">
+                                                            <Run Text="{Binding DirectionBadge, Mode=OneWay}" Foreground="{Binding DirectionTone, Converter={StaticResource Tone}, Mode=OneWay}" FontWeight="SemiBold" />
+                                                            <Run Text=" &#183; " />
+                                                            <Run Text="{Binding SizeFormatted, Mode=OneWay}" />
+                                                            <Run Text=" &#183; &#9889; " />
+                                                            <Run Text="{Binding SpeedFormatted, Mode=OneWay}" Foreground="{StaticResource Accent}" />
+                                                            <Run Text=" &#183; " />
+                                                            <Run Text="{Binding DeviceName, Mode=OneWay}" />
+                                                            <Run Text=" &#183; " />
+                                                            <Run Text="{Binding TimeFormatted, Mode=OneWay}" />
+                                                        </TextBlock>
+                                                    </StackPanel>
+                                                </DockPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+
+                            <!-- Empty State -->
+                            <TextBlock Text="No transfers recorded yet. Transfer files from phone to see history here."
+                                       Style="{StaticResource Caption}" Margin="0,6,0,0"
+                                       Visibility="{Binding FilteredTransfers.Count, Converter={StaticResource Vis}, ConverterParameter=invert}" />
                         </StackPanel>
                     </Border>
                 </StackPanel>

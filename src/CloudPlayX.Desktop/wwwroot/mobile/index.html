@@ -35,6 +35,44 @@
     </div>
   </div>
 
+  <!-- Floating Download Progress Card -->
+  <div id="download-progress-card" class="download-progress-card" style="display: none;">
+    <div class="dl-progress-top">
+      <div class="dl-progress-icon-box">
+        <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+      </div>
+      <div class="dl-progress-info">
+        <div class="dl-progress-title" id="dl-file-name">Downloading file...</div>
+        <div class="dl-progress-stats" id="dl-stats">0% • 0.0 MB/s</div>
+      </div>
+      <button class="dl-progress-close" onclick="dismissDownloadCard()" title="Dismiss">
+        <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+      </button>
+    </div>
+    <div class="dl-progress-bar-track">
+      <div class="dl-progress-bar-fill" id="dl-progress-bar" style="width: 0%;"></div>
+    </div>
+  </div>
+
+  <!-- Floating Download Progress Card -->
+  <div id="download-progress-card" class="download-progress-card" style="display: none;">
+    <div class="dl-progress-top">
+      <div class="dl-progress-icon-box">
+        <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+      </div>
+      <div class="dl-progress-info">
+        <div class="dl-progress-title" id="dl-file-name">Downloading file...</div>
+        <div class="dl-progress-stats" id="dl-stats">0% • 0.0 MB/s</div>
+      </div>
+      <button class="dl-progress-close" onclick="dismissDownloadCard()" title="Dismiss">
+        <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+      </button>
+    </div>
+    <div class="dl-progress-bar-track">
+      <div class="dl-progress-bar-fill" id="dl-progress-bar" style="width: 0%;"></div>
+    </div>
+  </div>
+
   <!-- TAB 1: BROWSE (Main Google Files Home) -->
   <main id="tab-browse" class="tab-screen active">
     <!-- Active Gaming Mini Banner (if PC game running) -->
@@ -224,6 +262,38 @@
             <svg viewBox="0 0 24 24" class="svg-chevron"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
           </div>
         </div>
+
+      </div>
+
+      <!-- Phone Device Metrics (Internal Storage & RAM) -->
+      <div class="storage-list" style="margin-top: 10px;">
+        <div class="storage-device-card" style="cursor: default;">
+          <div class="storage-dev-icon" style="background: rgba(52, 168, 83, 0.15); color: #34A853;">
+            <svg viewBox="0 0 24 24"><path d="M17 1.01L7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z"/></svg>
+          </div>
+          <div class="storage-dev-info">
+            <div class="storage-dev-title" id="phone-storage-title">Phone Storage</div>
+            <div class="storage-dev-sub" id="phone-storage-sub">Calculating free space...</div>
+            <div class="storage-bar-track">
+              <div class="storage-bar-fill" id="phone-storage-bar" style="width: 26%; background: #34A853;"></div>
+            </div>
+          </div>
+          <div style="font-size: 11.5px; font-weight: 600; color: #34A853;" id="phone-storage-badge">75 GB free</div>
+        </div>
+
+        <div class="storage-device-card" style="cursor: default;">
+          <div class="storage-dev-icon" style="background: rgba(251, 188, 4, 0.15); color: #FBBC04;">
+            <svg viewBox="0 0 24 24"><path d="M4 6h16v12H4z M2 4v16h20V4H2zm3 4h2v2H5V8zm0 4h2v2H5v-2zm4-4h2v2H9V8zm0 4h2v2H9v-2zm4-4h2v2h-2V8zm0 4h2v2h-2v-2zm4-4h2v2h-2V8zm0 4h2v2h-2v-2z"/></svg>
+          </div>
+          <div class="storage-dev-info">
+            <div class="storage-dev-title" id="phone-ram-title">Phone RAM</div>
+            <div class="storage-dev-sub" id="phone-ram-sub">Calculating memory...</div>
+            <div class="storage-bar-track">
+              <div class="storage-bar-fill" id="phone-ram-bar" style="width: 61%; background: #FBBC04;"></div>
+            </div>
+          </div>
+          <div style="font-size: 11.5px; font-weight: 600; color: #FBBC04;" id="phone-ram-badge">2.9 GB free</div>
+        </div>
       </div>
     </div>
   </main>
@@ -362,14 +432,30 @@
       </div>
     </div>
 
-    <!-- Transfer Activity Box -->
+    <!-- Synchronized Transfer History Section -->
     <div class="section-container" style="margin-top: 24px;">
       <div class="section-header">
-        <div class="section-title">Transfer History</div>
-        <div class="section-action" onclick="clearRecentActivity()">Clear</div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div class="section-title">Transfer History</div>
+          <span class="count-badge" id="share-history-count">0</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div class="section-action" onclick="fetchTransferHistory(true)">Refresh</div>
+          <div class="section-action danger" onclick="clearServerTransferHistory()">Clear</div>
+        </div>
       </div>
-      <div id="share-activity-list" class="activity-history-box">
-        <div class="empty-state-text">No transfers yet. Tap 'Send to PC' above to transfer files.</div>
+
+      <!-- Transfer Filter Chips -->
+      <div class="transfer-chips-row">
+        <button class="transfer-chip active" id="chip-filter-all" onclick="filterShareHistory('all')">All</button>
+        <button class="transfer-chip" id="chip-filter-received" onclick="filterShareHistory('received')">↓ Received</button>
+        <button class="transfer-chip" id="chip-filter-sent" onclick="filterShareHistory('sent')">↑ Sent</button>
+        <button class="transfer-chip" id="chip-filter-stream" onclick="filterShareHistory('stream')">► Streamed</button>
+      </div>
+
+      <!-- Transfer Items Container -->
+      <div id="share-transfers-container" class="transfers-history-cards">
+        <div class="empty-state-text">No transfers yet. Send or download files to see history.</div>
       </div>
     </div>
   </main>
@@ -432,7 +518,7 @@
 
   <!-- Hidden File Input Controls -->
   <input type="file" id="file-uploader" style="display: none;" onchange="handleFileSelection(event)" multiple>
-  <input type="file" id="photo-uploader" accept="image/*,video/*" style="display: none;" onchange="handleFileSelection(event)" multiple capture="environment">
+  <input type="file" id="photo-uploader" accept="image/*,video/*" style="display: none;" onchange="handleFileSelection(event)" multiple>
 
   <!-- Bottom Navigation Bar (Material 3 / Files by Google Style) -->
   <nav class="material-bottom-nav">
@@ -485,11 +571,18 @@
 
       <!-- Quick Action Buttons Strip -->
       <div class="m3-sheet-actions-grid">
-        <button class="m3-action-item" id="sheet-btn-stream" onclick="sheetActionStream()">
-          <div class="m3-action-icon-circle">
-            <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+        <button class="m3-action-item" id="sheet-btn-open" onclick="sheetActionOpen()">
+          <div class="m3-action-icon-circle" style="background: rgba(66, 133, 244, 0.15); color: #4285F4;">
+            <svg viewBox="0 0 24 24"><path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
           </div>
-          <span>Play</span>
+          <span id="sheet-open-label">Open</span>
+        </button>
+
+        <button class="m3-action-item" id="sheet-btn-open-with" onclick="sheetActionOpenWith()">
+          <div class="m3-action-icon-circle" style="background: rgba(168, 85, 247, 0.15); color: #A855F7;">
+            <svg viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/></svg>
+          </div>
+          <span>Open with…</span>
         </button>
 
         <button class="m3-action-item" id="sheet-btn-download" onclick="sheetActionDownload()">
@@ -516,6 +609,22 @@
 
       <!-- Secondary Detailed List Options -->
       <div class="m3-sheet-list">
+        <div class="m3-sheet-row" onclick="sheetActionOpenOnPc()">
+          <svg viewBox="0 0 24 24"><path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/></svg>
+          <div class="m3-sheet-row-text">
+            <div>Open on Laptop / PC</div>
+            <div class="m3-sheet-row-sub">Launch in default Windows app on PC screen</div>
+          </div>
+        </div>
+
+        <div class="m3-sheet-row" onclick="sheetActionOpenWith()">
+          <svg viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/></svg>
+          <div class="m3-sheet-row-text">
+            <div>Open with other App…</div>
+            <div class="m3-sheet-row-sub">Choose VLC, MX Player, Photos, Adobe, etc.</div>
+          </div>
+        </div>
+
         <div class="m3-sheet-row" onclick="sheetActionDownload()">
           <svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/></svg>
           <div class="m3-sheet-row-text">
@@ -575,16 +684,83 @@
     </div>
   </div>
 
-  <!-- Video Player Modal -->
-  <div id="video-modal" class="modal-backdrop">
-    <div class="modal-card" style="padding: 12px;">
-      <div class="modal-header">
-        <div class="modal-title" id="video-player-filename">Streaming Video</div>
-        <button class="modal-close-btn" onclick="closeVideoModal()">
-          <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+  <!-- Universal File Viewer Modal (Video, Audio, Photos, Docs, Code, Text) -->
+  <div id="file-viewer-modal" class="modal-backdrop" onclick="closeViewerModal(event)">
+    <div class="viewer-modal-card" onclick="event.stopPropagation()">
+      <div class="viewer-modal-header">
+        <button class="viewer-btn-icon" onclick="closeViewerModal()" title="Back / Close">
+          <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
         </button>
+        <div class="viewer-header-info">
+          <div class="viewer-title" id="viewer-filename">File Name</div>
+          <div class="viewer-sub" id="viewer-meta">Size • Drive</div>
+        </div>
+        <div class="viewer-header-actions">
+          <button class="viewer-btn-icon" onclick="openWithCurrentFile()" title="Open in System App">
+            <svg viewBox="0 0 24 24"><path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
+          </button>
+          <button class="viewer-btn-icon" onclick="openOnPcCurrentFile()" title="Open on PC">
+            <svg viewBox="0 0 24 24"><path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/></svg>
+          </button>
+          <button class="viewer-btn-icon" onclick="downloadCurrentFile()" title="Download to Phone">
+            <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+          </button>
+        </div>
       </div>
-      <video id="native-video-player" class="video-view" controls playsinline></video>
+
+      <!-- Video Content View -->
+      <div id="viewer-section-video" class="viewer-section" style="display: none;">
+        <video id="native-video-player" class="video-view" controls playsinline></video>
+      </div>
+
+      <!-- Image Content View -->
+      <div id="viewer-section-image" class="viewer-section" style="display: none;">
+        <div class="image-viewer-wrap">
+          <img id="viewer-image-elem" src="" alt="Photo preview" class="viewer-img" />
+        </div>
+      </div>
+
+      <!-- Audio Content View -->
+      <div id="viewer-section-audio" class="viewer-section" style="display: none;">
+        <div class="audio-viewer-card">
+          <div class="audio-viewer-art">
+            <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+          </div>
+          <div class="audio-viewer-title" id="viewer-audio-title">Song Title</div>
+          <div class="audio-viewer-sub" id="viewer-audio-sub">Audio Streaming</div>
+          <audio id="viewer-audio-player" class="audio-control-bar" controls playsinline></audio>
+        </div>
+      </div>
+
+      <!-- Text / Code Preview View -->
+      <div id="viewer-section-text" class="viewer-section" style="display: none;">
+        <div class="text-preview-card">
+          <pre id="viewer-text-content" class="text-preview-code"></pre>
+        </div>
+      </div>
+
+      <!-- Generic Document / File View -->
+      <div id="viewer-section-generic" class="viewer-section" style="display: none;">
+        <div class="generic-viewer-card">
+          <div class="generic-viewer-icon" id="viewer-generic-icon"></div>
+          <div class="generic-viewer-name" id="viewer-generic-name">File.ext</div>
+          <div class="generic-viewer-sub" id="viewer-generic-sub">Ready to open or stream</div>
+          <div class="generic-viewer-actions">
+            <button class="m3-filled-btn" onclick="openWithCurrentFile()">
+              <svg viewBox="0 0 24 24"><path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
+              <span>Open with App</span>
+            </button>
+            <button class="m3-tonal-btn" onclick="openOnPcCurrentFile()">
+              <svg viewBox="0 0 24 24"><path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/></svg>
+              <span>Open on Laptop</span>
+            </button>
+            <button class="m3-tonal-btn" onclick="downloadCurrentFile()">
+              <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+              <span>Download</span>
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 

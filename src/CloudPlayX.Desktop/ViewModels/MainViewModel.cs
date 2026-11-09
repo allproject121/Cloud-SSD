@@ -53,7 +53,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     public void Navigate(string title)
     {
-        var p = Pages.FirstOrDefault(x => x.Title == title);
+        var p = Pages.FirstOrDefault(x => x.Title.Equals(title, StringComparison.OrdinalIgnoreCase) || x.Title.Contains(title, StringComparison.OrdinalIgnoreCase));
         if (p != null) Selected = p;
     }
 
