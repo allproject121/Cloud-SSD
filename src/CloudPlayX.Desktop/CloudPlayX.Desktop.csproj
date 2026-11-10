@@ -1,13 +1,13 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
     <AssemblyName>Cloud-SSD</AssemblyName>
     <RootNamespace>CloudPlayX.Desktop</RootNamespace>
-    <Product>Cloud Drive</Product>
-    <Title>Cloud Drive</Title>
-    <Description>Cloud Drive - High-Speed Cloud-to-SSD Virtual Drive Engine</Description>
+    <Product>Cloud-SSD</Product>
+    <Title>Cloud-SSD</Title>
+    <Description>Cloud-SSD - High-Speed Cloud-to-SSD Virtual Drive Engine</Description>
     <ApplicationIcon>Assets\clouddrive.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>

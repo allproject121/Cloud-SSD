@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.Json.Nodes;
 using CloudPlayX.Core;
 using CloudPlayX.Diagnostics;
@@ -17,7 +17,7 @@ public sealed record RemoteItem(string Name, string Path, bool IsDir, long Size,
 public sealed record CloudAccountInfo(string Remote, string? Email, string? DisplayName, long? UsedBytes, long? TotalBytes, long? FreeBytes, bool Reachable);
 
 /// <summary>
-/// Owns CLOUDPLAY X's private rclone config file (%LOCALAPPDATA%\CloudPlayX\rclone.conf). When encryption is enabled
+/// Owns Cloud-SSD's private rclone config file (%LOCALAPPDATA%\CloudPlayX\rclone.conf). When encryption is enabled
 /// the file is encrypted by rclone itself with a random password that is stored DPAPI-protected and handed to rclone
 /// only through the RCLONE_CONFIG_PASS environment variable.
 /// </summary>

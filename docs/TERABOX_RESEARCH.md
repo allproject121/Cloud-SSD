@@ -1,4 +1,4 @@
-# TeraBox — integration research (status: not supported)
+﻿# TeraBox — integration research (status: not supported)
 
 Researched 2026-10-10.
 
@@ -14,7 +14,7 @@ Researched 2026-10-10.
 
 ## Decision
 
-CLOUDPLAY X does **not** integrate TeraBox:
+Cloud-SSD does **not** integrate TeraBox:
 
 - The available method depends on session cookies and undocumented endpoints. That conflicts with the project rules
   (no bypassing authentication, no undocumented endpoints, no silent dependence on scraping) and is fragile:
@@ -28,7 +28,7 @@ so the UI explains the situation instead of offering a broken option.
 
 An official TeraBox API with (1) OAuth or API-key authentication intended for third-party apps, (2) directory
 listing with sizes/modification times, and (3) downloads that honour HTTP `Range`. With those, a rclone backend
-(preferred, upstream) or a CLOUDPLAY X provider adapter becomes feasible.
+(preferred, upstream) or a Cloud-SSD provider adapter becomes feasible.
 
 ## Alternatives for large cheap storage today
 

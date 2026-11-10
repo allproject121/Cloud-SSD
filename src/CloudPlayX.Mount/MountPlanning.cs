@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using CloudPlayX.Core;
 
 namespace CloudPlayX.Mount;
@@ -50,7 +50,7 @@ public sealed record MountPlanInput(
     string? RemoteType);
 
 /// <summary>
-/// Translates CLOUDPLAY X settings into rclone mount arguments. Every optional flag is checked against the flags the
+/// Translates Cloud-SSD settings into rclone mount arguments. Every optional flag is checked against the flags the
 /// installed rclone reports, so an older rclone gets a warning instead of a failed mount.
 /// </summary>
 public static class MountFlagBuilder

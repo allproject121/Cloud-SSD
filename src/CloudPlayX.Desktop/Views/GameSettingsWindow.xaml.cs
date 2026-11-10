@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using CloudPlayX.App;
 using CloudPlayX.Core;
 using CloudPlayX.Diagnostics;
@@ -51,7 +51,7 @@ public partial class GameSettingsWindow : Window
         UpdateSaveHint();
 
         AwareBox.IsChecked = game.GameAwareEnabled;
-        AwareHint.Text = $"Requires a mod/plugin that writes JSON lines to \\\\.\\pipe\\cloudplayx-telemetry-{new string(game.Id.Where(char.IsLetterOrDigit).ToArray())} (current Windows user only). " +
+        AwareHint.Text = $"Requires a mod/plugin that writes JSON lines to \\\\.\\pipe\\cloudssd-telemetry-{new string(game.Id.Where(char.IsLetterOrDigit).ToArray())} (current Windows user only). " +
                          "No game ships such a plugin today; without one this option has no effect. See docs/GAME_AWARE_PROTOCOL.md.";
     }
 

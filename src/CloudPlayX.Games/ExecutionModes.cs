@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using CloudPlayX.Core;
@@ -14,7 +14,7 @@ public sealed record HybridBuildResult(string LocalRoot, int Copied, int Linked,
 /// Hybrid Optimized mode: builds a real local folder on the SSD that mirrors the game's directory tree. Executables,
 /// DLLs, configuration and small files are copied locally (fast, writable, launch from a normal NTFS path); large asset
 /// files become symbolic links into the cloud drive and are streamed. New files the game writes land on the SSD.
-/// Requires Windows Developer Mode (or admin) for unprivileged symbolic links; CLOUDPLAY X never enables it silently.
+/// Requires Windows Developer Mode (or admin) for unprivileged symbolic links; Cloud-SSD never enables it silently.
 /// </summary>
 public static class HybridBuilder
 {

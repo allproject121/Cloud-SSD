@@ -1,6 +1,6 @@
-# Third-party notices
+﻿# Third-party notices
 
-CLOUDPLAY X bundles or depends on the following components.
+Cloud-SSD bundles or depends on the following components.
 
 ## rclone (bundled: `tools/rclone/rclone.exe`, v1.75.2)
 
@@ -36,7 +36,7 @@ official `SHA256SUMS` (included next to the binary).
 https://winfsp.dev, Copyright (C) Bill Zissimopoulos / Navimatics LLC. GPLv3 with a FLOSS exception. Source
 code: https://github.com/winfsp/winfsp. The setup program carries the unmodified, Authenticode-signed
 `winfsp-2.1.25156.msi` from https://github.com/winfsp/winfsp/releases and runs it only when WinFsp is missing.
-CLOUDPLAY X does not link WinFsp; rclone uses the WinFsp installation present on the system. WinFsp is a separate
+Cloud-SSD does not link WinFsp; rclone uses the WinFsp installation present on the system. WinFsp is a separate
 program with its own uninstall entry ("WinFsp 2025").
 
 ## NuGet packages

@@ -1,6 +1,6 @@
-# CLOUDPLAY X — Architecture
+﻿# Cloud-SSD — Architecture
 
-CLOUDPLAY X runs games on the user's own PC from files stored in cloud storage. It is built on proven components —
+Cloud-SSD runs games on the user's own PC from files stored in cloud storage. It is built on proven components —
 **rclone** (cloud backends + VFS sparse cache) and **WinFsp** (Windows user-mode filesystem) — and adds orchestration,
 telemetry, prediction, game management and a desktop UI. No kernel driver and no second cache layer.
 

@@ -1,7 +1,7 @@
-namespace CloudPlayX.Core;
+﻿namespace CloudPlayX.Core;
 
 /// <summary>
-/// rclone's log does not say which process issued a read. CLOUDPLAY X's own prefetch reads are registered here
+/// rclone's log does not say which process issued a read. Cloud-SSD's own prefetch reads are registered here
 /// (path, byte range, time window) so telemetry can separate them from the game's reads. A read is attributed to
 /// prefetch only when its range overlaps a registered range AND it started inside that prefetch's time window.
 /// </summary>

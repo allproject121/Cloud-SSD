@@ -1,9 +1,9 @@
-using CloudPlayX.Core;
+﻿using CloudPlayX.Core;
 
 namespace CloudPlayX.Streaming;
 
 /// <summary>
-/// Download priority. P0 is the game's own read, served directly by rclone; CLOUDPLAY X never competes with it and
+/// Download priority. P0 is the game's own read, served directly by rclone; Cloud-SSD never competes with it and
 /// only schedules P1-P3 work.
 /// </summary>
 public enum Priority { P0Critical = 0, P1Imminent = 1, P2Likely = 2, P3Background = 3 }

@@ -1,10 +1,10 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using CloudPlayX.Core;
 using Microsoft.Data.Sqlite;
 
 namespace CloudPlayX.Games;
 
-/// <summary>Game library persisted in the CLOUDPLAY X SQLite database.</summary>
+/// <summary>Game library persisted in the Cloud-SSD SQLite database.</summary>
 public sealed class GameLibrary
 {
     private readonly string _cs;

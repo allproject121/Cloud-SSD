@@ -1,10 +1,10 @@
-namespace CloudPlayX.Providers;
+﻿namespace CloudPlayX.Providers;
 
 public enum SupportLevel
 {
-    /// <summary>Implemented and exercised by CLOUDPLAY X's own workflow (connect, mount, stream).</summary>
+    /// <summary>Implemented and exercised by Cloud-SSD's own workflow (connect, mount, stream).</summary>
     Supported,
-    /// <summary>Works through the corresponding rclone backend; not tested end-to-end by CLOUDPLAY X.</summary>
+    /// <summary>Works through the corresponding rclone backend; not tested end-to-end by Cloud-SSD.</summary>
     AvailableUntested,
     /// <summary>No authorized integration exists; the adapter is a placeholder that explains why.</summary>
     Unsupported
@@ -12,7 +12,7 @@ public enum SupportLevel
 
 public sealed record ProviderCapabilities(bool RangeReads, bool Checksums, bool Writes, bool ChangeNotifications, string? Notes = null);
 
-/// <summary>Describes one cloud backend and how CLOUDPLAY X connects to it.</summary>
+/// <summary>Describes one cloud backend and how Cloud-SSD connects to it.</summary>
 public interface ICloudProvider
 {
     string Id { get; }
@@ -59,7 +59,7 @@ public static class ProviderRegistry
         "terabox", "TeraBox", null, SupportLevel.Unsupported,
         new ProviderCapabilities(false, false, false, false,
             "No official rclone backend. The community fork that exists authenticates with browser session cookies against undocumented web endpoints, " +
-            "which CLOUDPLAY X will not use. Revisit when TeraBox publishes a public API with OAuth and byte-range downloads."),
+            "which Cloud-SSD will not use. Revisit when TeraBox publishes a public API with OAuth and byte-range downloads."),
         RequiresOAuthClient: false,
         "Not available. See docs/TERABOX_RESEARCH.md.", null);
 

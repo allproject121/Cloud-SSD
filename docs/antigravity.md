@@ -1,4 +1,4 @@
-# ANTIGRAVITY.md — Cloud-SSD Work Log & Action Registry
+﻿# ANTIGRAVITY.md — Cloud-SSD Work Log & Action Registry
 
 > **Purpose:** Antigravity agent dwara Cloud-SSD project mein kiye gaye sabhi kaam (bug fixes, code edits, audits, scans aur maintenance) ka exclusive log.  
 > **App Name:** Cloud-SSD (Virtual Drive: Cloud Drive)  
@@ -114,7 +114,7 @@ Poore project aur compiled binary files ki gehri jaanch ki gayi:
 ### [Step 2.30] - 2026-11-09 11:23:00 IST
 - **Task**: GitHub Repository Initialization & Full Source Code Upload
 - **Status**: COMPLETED
-- **Remote**: https://github.com/allproject121/Cloud-Drive.git
+- **Remote**: https://github.com/allproject121/Cloud-SSD.git
 - **Branch**: main
 - **Output**: 198 source files cleanly committed and pushed to GitHub main branch.
 
@@ -172,7 +172,7 @@ Poore project aur compiled binary files ki gehri jaanch ki gayi:
      - Recompiled Cloud-SSD-0.7.0-setup.exe (68.7 MB, SHA256: ca71320de1043bd105c2609ffcb8d2dadd59fe1ae035fe52ab9111f6ad63cb4f).
   4. **GitHub Releases Deployment**:
      - Synced Cloud-SSD-0.7.0-setup.exe, Cloud-SSD-Mobile.apk, and CloudDrive.apk into eleases/.
-     - Pushed all commits to https://github.com/allproject121/Cloud-Drive.git.
+     - Pushed all commits to https://github.com/allproject121/Cloud-SSD.git.
 
 ### [Step 3.20] - 2026-11-09 20:10:00 IST
 - **Task**: Smart Storage Saver Desktop UI Integration & Fresh Release Build
@@ -185,4 +185,28 @@ Poore project aur compiled binary files ki gehri jaanch ki gayi:
   2. **Fresh Windows Setup Installer (Inno Setup 6)**:
      - Recompiled Cloud-SSD-0.7.0-setup.exe (68.7 MB, SHA256: 8d6dfa3d7c54dff9db5efbd38c74bda914971f5b275dd9917438aa9b796fa980).
   3. **GitHub Push**:
-     - Synced updated binaries to eleases/ and pushed to https://github.com/allproject121/Cloud-Drive.git.
+     - Synced updated binaries to eleases/ and pushed to https://github.com/allproject121/Cloud-SSD.git.
+
+### [Step 3.50] - 2026-11-10 16:25:00 IST
+- **Task**: Global Rebranding (CloudPlay X ➔ Cloud-SSD), Comprehensive Laptop & Phone README, 5TB Tools Integration, Fresh Release & Remote Setup
+- **Status**: COMPLETED
+- **Detailed Key Changes**:
+  1. **Forensic Rebranding across Codebase & Docs**:
+     - Systematically replaced all occurrences of CLOUDPLAY X, CloudPlay X, cloudplay x with Cloud-SSD in:
+       - Core documentation: ARCHITECTURE.md, BENCHMARKS.md, BUILD_STATUS.md, COMPATIBILITY.md, CONTRIBUTING.md, KNOWN_LIMITATIONS.md, LICENSE, SECURITY.md, TEST_REPORT.md, THIRD_PARTY_NOTICES.md, docs/*.
+       - Benchmark files: enchmarks/CloudPlayX.Benchmarks/Program.cs, enchmarks/results/*.
+       - Source code doc-comments & pipes: AppHost.cs, CacheInspector.cs, DiskSafety.cs, ReadAttribution.cs, ExecutionModes.cs, GameLauncher.cs, GameLibrary.cs, MountPlanning.cs, MountService.cs, RcloneConfigService.cs, Providers.cs, Predictions.cs, PrefetchScheduler.cs, StreamingEngine.cs, GameSettingsWindow.xaml.cs.
+       - Desktop WPF UI: MainWindow.xaml (Title="Cloud-SSD"), CloudPlayX.Desktop.csproj (Product, Title, Description), pp.manifest.
+  2. **5TB Multi-Drive Pooling Scripts Integration**:
+     - Migrated useful standalone scripts from Cloud-SSD-5TB into 	ools/5tb-scripts/ (GUI App, Manager, Mount/Unmount batch scripts, and helper PowerShell modules).
+     - Excluded sensitive user credentials (clone.conf), temporary logs, and duplicate 85MB rclone binary.
+  3. **Dual Platform Documentation (Laptop + Phone)**:
+     - Comprehensively updated README.md with dedicated deep-dive sections for:
+       - **Laptop / PC Edition (Windows Desktop App)**: Virtual drive mount (X: / Z:), 5TB–15TB Google Drive pooling, sparse cache safety guard (10–40 GB budget, 10 GB reserve), Memory Relief Engine (frees 3–5 GB RAM), and 3 game launch modes.
+       - **Phone / Android Edition (Mobile Companion APK)**: Live PC performance & gaming HUD, remote 1-tap game launcher, 100% offline save vault (IndexedDB), and 4K partial range media streaming.
+       - Direct download links for both eleases/Cloud-SSD-0.7.0-setup.exe and eleases/Cloud-SSD-Mobile.apk.
+  4. **Fresh Installer & Test Verification**:
+     - Recompiled Windows Setup Installer via Inno Setup 6: eleases/Cloud-SSD-0.7.0-setup.exe (69 MB, SHA256: ea3e34e3b35a88fcf4c51952606620ee4db0adce04878cd7b6f3807daff0b03d).
+     - Executed complete test suite: 148 of 148 unit tests passing cleanly (0 failures, 0 skipped).
+  5. **Repository Remote Target**:
+     - Remote target configured to https://github.com/allproject121/Cloud-SSD.git.

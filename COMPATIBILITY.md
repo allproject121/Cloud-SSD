@@ -1,4 +1,4 @@
-# Compatibility
+﻿# Compatibility
 
 Only behaviour that was actually executed is listed as verified. Everything else is labelled honestly.
 
@@ -29,7 +29,7 @@ dummy client; the mount, cache and streaming layers are backend-independent and 
 | Multiple concurrent handles | ✅ verified | integration test |
 | Memory-mapped reads | ✅ verified | integration test |
 | File timestamps and sizes | ✅ verified | integration test |
-| Executable launch from the drive | ✅ verified (requires `--file-perms 0777`, set by CLOUDPLAY X) | integration test (`where.exe`, `hostname.exe`, demo game) |
+| Executable launch from the drive | ✅ verified (requires `--file-perms 0777`, set by Cloud-SSD) | integration test (`where.exe`, `hostname.exe`, demo game) |
 | Executable launch through a symbolic link into the drive | ✅ verified | probe + Hybrid launch |
 | Writes, rename, mkdir, delete (writable remote) | ✅ verified | integration test (local backend) |
 | Pending uploads survive an rclone crash | ✅ verified | integration test |

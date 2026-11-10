@@ -1,9 +1,9 @@
-<Window x:Class="CloudPlayX.Desktop.MainWindow"
+﻿<Window x:Class="CloudPlayX.Desktop.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:CloudPlayX.Desktop.ViewModels"
         xmlns:v="clr-namespace:CloudPlayX.Desktop.Views"
-        Title="Cloud Drive" Height="650" Width="1180" MinWidth="850" MinHeight="500"
+        Title="Cloud-SSD" Height="650" Width="1180" MinWidth="850" MinHeight="500"
         Background="{StaticResource Bg}" FontFamily="{StaticResource UiFont}" Foreground="{StaticResource Text}"
         WindowStartupLocation="CenterScreen" Icon="Assets/clouddrive.ico">
     <Window.Resources>

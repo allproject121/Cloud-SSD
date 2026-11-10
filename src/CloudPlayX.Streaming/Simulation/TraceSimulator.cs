@@ -1,4 +1,4 @@
-using CloudPlayX.Core;
+﻿using CloudPlayX.Core;
 
 namespace CloudPlayX.Streaming.Simulation;
 
@@ -10,7 +10,7 @@ public enum SimPolicy
     RcloneDefault,
     /// <summary>rclone VFS full cache with --buffer-size 0: only the bytes actually read are fetched.</summary>
     OnDemand,
-    /// <summary>OnDemand plus the CLOUDPLAY X prediction engine.</summary>
+    /// <summary>OnDemand plus the Cloud-SSD prediction engine.</summary>
     Engine
 }
 

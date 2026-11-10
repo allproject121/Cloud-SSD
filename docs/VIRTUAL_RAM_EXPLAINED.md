@@ -1,4 +1,4 @@
-# VIRTUAL_RAM_EXPLAINED.md — Laptop RAM Expansion & Cloud Reality Guide
+﻿# VIRTUAL_RAM_EXPLAINED.md — Laptop RAM Expansion & Cloud Reality Guide
 
 > **Topic:** Kya Cloud-SSD ki tarah Laptop ke liye RAM bhi banayi ja sakti hai?  
 > **Language:** Hinglish (Roman Hindi)  
@@ -75,6 +75,6 @@ Hum **Cloud-SSD** desktop app ke andar ek naya module add kar rahe hain:
 
 <div align="center">
 
-*Documented by Antigravity for Cloud-SSD / Cloud-Drive Project.*
+*Documented by Antigravity for Cloud-SSD Project.*
 
 </div>

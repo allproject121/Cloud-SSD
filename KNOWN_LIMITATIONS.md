@@ -5,7 +5,7 @@ These are real, current limitations — measured or confirmed, not hypothetical.
 ## Physics of the network
 
 - **Uncached data arrives at internet speed.** 70 Mbps is at most 8.75 MB/s (measured 69.8 Mbps through the mount on
-  a 70 Mbps simulated link). No caching or prediction makes a cold read as fast as an SSD. CLOUDPLAY X approaches SSD
+  a 70 Mbps simulated link). No caching or prediction makes a cold read as fast as an SSD. Cloud-SSD approaches SSD
   behaviour only for data that is already cached.
 - **Prediction does not create bandwidth.** In the simulation benchmarks, a learned profile alone barely changed load
   time while the game itself saturated the link; the large gain came from *Optimize & Prepare*, which downloads the
@@ -18,7 +18,7 @@ These are real, current limitations — measured or confirmed, not hypothetical.
 ## rclone / WinFsp behaviour (rclone 1.75.2)
 
 - The cache size limit is **not instantaneous**: open files are never evicted and cleanup runs every poll interval
-  (CLOUDPLAY X uses 30 s), so usage can briefly exceed the limit. A 10 % margin is reserved and CLOUDPLAY X pauses its
+  (Cloud-SSD uses 30 s), so usage can briefly exceed the limit. A 10 % margin is reserved and Cloud-SSD pauses its
   own prefetching under disk pressure.
 - **Range index persistence:** rclone writes a file's downloaded-range index only after the last handle closes plus
   its 5 s handle-caching delay. After a crash or forced kill, data for files open at that moment stays on disk but is
@@ -38,11 +38,11 @@ These are real, current limitations — measured or confirmed, not hypothetical.
 - Per-read telemetry comes from rclone's debug log (`-vv`). It is exact (offset, size, rclone's own hit/miss verdict,
   wait time) but costs some CPU and log I/O while profiling is enabled (log rotates at 64 MiB). It can be turned off in
   Settings, which also disables profiles and hit/miss metrics.
-- rclone does not record which process issued a read. CLOUDPLAY X separates its own prefetch reads by registering
+- rclone does not record which process issued a read. Cloud-SSD separates its own prefetch reads by registering
   each prefetch's byte range and time window; a game read of the same range during that window would be counted as
   prefetch (rare, minor effect on accuracy figures).
 - Windows Defender's on-access scan reads the start and end of files when they are opened; on a cold cache these
-  reads cause extra downloads. CLOUDPLAY X does not change security settings.
+  reads cause extra downloads. Cloud-SSD does not change security settings.
 - ETW file I/O tracing was not used: it requires administrator rights, and rclone's log already provides byte-exact
   VFS-level data.
 
@@ -50,7 +50,7 @@ These are real, current limitations — measured or confirmed, not hypothetical.
 
 - **No commercial game has been tested.** Only the DRM-free CPX demo game and Windows console tools were executed.
 - Launcher-managed games (Steam, Epic, Ubisoft, Rockstar) generally need their launcher and a local installation;
-  CLOUDPLAY X never bypasses ownership checks, DRM or anti-cheat.
+  Cloud-SSD never bypasses ownership checks, DRM or anti-cheat.
 - Kernel anti-cheat titles are flagged "Requires local installation".
 - "Verified" requires a monitored run of ≥ 60 s; short test programs never become Verified.
 - Hybrid mode needs Developer Mode (or admin) for unprivileged symbolic links. Writes into a *symlinked* file go to
@@ -66,8 +66,8 @@ These are real, current limitations — measured or confirmed, not hypothetical.
   The OAuth state machine was tested up to the browser step with a dummy client.
 - Google OAuth apps left in *Testing* mode expire refresh tokens after 7 days.
 - **TeraBox is not supported** (no official API; see docs/TERABOX_RESEARCH.md).
-- OneDrive, Dropbox, S3 and NAS work through rclone but are untested by CLOUDPLAY X and must be configured with
-  `rclone config` against CLOUDPLAY X's config file.
+- OneDrive, Dropbox, S3 and NAS work through rclone but are untested by Cloud-SSD and must be configured with
+  `rclone config` against Cloud-SSD's config file.
 
 ## Packaging
 

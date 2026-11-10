@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Drawing;
 using System.Text.Json;
 using System.Windows.Forms;
@@ -6,7 +6,7 @@ using System.Windows.Forms;
 namespace CpxDemoGame;
 
 /// <summary>
-/// CLOUDPLAY X demo game: a DRM-free test workload that behaves like a game's loader. It reads asset archives with a
+/// Cloud-SSD demo game: a DRM-free test workload that behaves like a game's loader. It reads asset archives with a
 /// fixed, game-like pattern (archive headers and tail indexes, scattered menu assets, then a level with a long
 /// sequential region plus scattered reads), shows a loading screen and records its own load time.
 ///

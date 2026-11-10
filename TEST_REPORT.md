@@ -1,4 +1,4 @@
-# Test report — CLOUDPLAY X 0.7.0
+﻿# Test report — Cloud-SSD 0.7.0
 
 All tests below were **actually executed** on the development PC on 2026-10-10/11:
 Windows 11 Pro 25H2 (10.0.26200), non-admin user, Developer Mode on, Intel i3-10105F, RX 580, 16 GB RAM,
@@ -125,7 +125,7 @@ Executed on the same PC (WinFsp already installed) with `CloudPlayX-0.7.0-setup.
 | Check | Result |
 |---|---|
 | Install: files, rclone, uninstaller present; product version 0.7.0 | passed |
-| Installed app starts (window "CLOUDPLAY X", separate test data folder) | passed |
+| Installed app starts (window "Cloud-SSD", separate test data folder) | passed |
 | Setup while the app is running | refused (exit 1, AppMutex) |
 | Setup while an rclone process runs from the install folder (mounted drive) | refused with the "drive still mounted" message (exit 7) |
 | Upgrade over an existing install | passed |

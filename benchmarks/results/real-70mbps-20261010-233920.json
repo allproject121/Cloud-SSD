@@ -1,4 +1,4 @@
-[
+﻿[
   {
     "Scenario": "A SSD baseline (first run)",
     "LoadMs": 90.5842,
@@ -54,7 +54,7 @@
     "Notes": "buffer-size 16M, chunk 128M"
   },
   {
-    "Scenario": "C CLOUDPLAY X cold (no profile)",
+    "Scenario": "C Cloud-SSD cold (no profile)",
     "LoadMs": 21005.7382,
     "StartupMs": 1153.2523000000006,
     "MenuMs": 9988.015700000009,
@@ -72,7 +72,7 @@
     "Notes": "buffer-size 0, chunk 4M, prediction on"
   },
   {
-    "Scenario": "D CLOUDPLAY X warm (2 profiled launches, cache cleared, Prepare, unseen level)",
+    "Scenario": "D Cloud-SSD warm (2 profiled launches, cache cleared, Prepare, unseen level)",
     "LoadMs": 8150.7329,
     "StartupMs": 269.9356,
     "MenuMs": 1293.6992999999989,
@@ -90,7 +90,7 @@
     "Notes": "readiness: Ready to launch"
   },
   {
-    "Scenario": "D\u0027 CLOUDPLAY X fully warm cache (same level again)",
+    "Scenario": "D\u0027 Cloud-SSD fully warm cache (same level again)",
     "LoadMs": 153.7123,
     "StartupMs": 12.617499999999994,
     "MenuMs": 31.904199999999918,

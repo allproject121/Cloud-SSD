@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using CloudPlayX.Core;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -57,7 +57,7 @@ public sealed record PrepareResult(bool HadProfile, int ProfileSessions, int Pla
 }
 
 /// <summary>
-/// The CLOUDPLAY X prediction engine (Universal Mode). Consumes real read telemetry, learns per-game access profiles,
+/// The Cloud-SSD prediction engine (Universal Mode). Consumes real read telemetry, learns per-game access profiles,
 /// predicts upcoming reads, and schedules prefetches that warm rclone's cache without competing with the game.
 /// </summary>
 public sealed class StreamingEngine : IForegroundMonitor, IAsyncDisposable

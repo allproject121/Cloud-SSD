@@ -1,4 +1,4 @@
-# Build status — CLOUDPLAY X 0.7.0
+﻿# Build status — Cloud-SSD 0.7.0
 
 Legend: ✅ implemented and tested on this machine · 🟡 implemented, partially tested / tested only in simulation ·
 ⚪ implemented, not exercised by automated tests · ⛔ blocked (external dependency) · ❌ not implemented

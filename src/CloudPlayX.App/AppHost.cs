@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using CloudPlayX.Cache;
 using CloudPlayX.Core;
 using CloudPlayX.Diagnostics;
@@ -11,7 +11,7 @@ using Microsoft.Extensions.Logging;
 namespace CloudPlayX.App;
 
 /// <summary>
-/// The CLOUDPLAY X application service: owns settings, rclone, mounts, the prediction engine, the game library and
+/// The Cloud-SSD application service: owns settings, rclone, mounts, the prediction engine, the game library and
 /// metrics, and wires real telemetry from rclone into the engine. UI and CLI are thin layers over this class.
 /// </summary>
 public sealed class AppHost : IAsyncDisposable
@@ -124,7 +124,7 @@ public sealed class AppHost : IAsyncDisposable
     public static AppHost Create(AppPaths? paths = null) => new(paths ?? new AppPaths());
 
     /// <summary>
-    /// Prevents two CLOUDPLAY X instances from owning the same data/cache directories (concurrent cache ownership
+    /// Prevents two Cloud-SSD instances from owning the same data/cache directories (concurrent cache ownership
     /// would corrupt rclone's cache). Returns false if another instance holds the lock.
     /// </summary>
     public bool TryAcquireInstanceLock()

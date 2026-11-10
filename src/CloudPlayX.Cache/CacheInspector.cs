@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using CloudPlayX.Core;
 
 namespace CloudPlayX.Cache;
@@ -39,7 +39,7 @@ public sealed record CacheUsage(
 
 /// <summary>
 /// Reads rclone's VFS cache layout: &lt;cache-dir&gt;\vfs\&lt;fs&gt;\path (sparse data) and &lt;cache-dir&gt;\vfsMeta\&lt;fs&gt;\path (JSON
-/// with Size, ATime, Dirty, Fingerprint and the list of downloaded ranges "Rs"). Read-only: CLOUDPLAY X never edits
+/// with Size, ATime, Dirty, Fingerprint and the list of downloaded ranges "Rs"). Read-only: Cloud-SSD never edits
 /// rclone's cache while rclone owns it.
 /// </summary>
 public static class CacheInspector

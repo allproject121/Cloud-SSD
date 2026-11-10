@@ -1,6 +1,6 @@
-# Contributing
+﻿# Contributing
 
-Thanks for helping. A few ground rules keep CLOUDPLAY X honest and safe:
+Thanks for helping. A few ground rules keep Cloud-SSD honest and safe:
 
 - **No DRM, anti-cheat, launcher or ownership bypasses.** Pull requests that add them are closed.
 - **No fabricated numbers.** Metrics, benchmarks and "game works" claims must come from a real, reproducible run.

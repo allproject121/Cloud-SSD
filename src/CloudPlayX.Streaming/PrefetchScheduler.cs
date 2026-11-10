@@ -1,4 +1,4 @@
-using System.Buffers;
+﻿using System.Buffers;
 using System.Diagnostics;
 using CloudPlayX.Core;
 
@@ -13,7 +13,7 @@ public interface IPrefetchExecutor
 
 /// <summary>
 /// Prefetches by reading the block through the mounted drive. rclone's VFS (full cache mode) stores the downloaded
-/// range in its sparse cache file, so CLOUDPLAY X adds no second cache layer. Each read is registered with the mount's
+/// range in its sparse cache file, so Cloud-SSD adds no second cache layer. Each read is registered with the mount's
 /// attribution registry so telemetry does not mistake it for a game read.
 /// </summary>
 public sealed class MountReadExecutor : IPrefetchExecutor

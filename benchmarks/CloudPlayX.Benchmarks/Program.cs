@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
@@ -13,7 +13,7 @@ using CloudPlayX.Streaming.Simulation;
 namespace CloudPlayX.Benchmarks;
 
 /// <summary>
-/// Reproducible CLOUDPLAY X benchmarks.
+/// Reproducible Cloud-SSD benchmarks.
 ///   sim  [--scale 0.25]                       deterministic trace simulation matrix (no I/O)
 ///   real --dataset &lt;dir&gt; [--mbps 70] [--latency 80] real launches of the CPX demo game over SimCloud + rclone + WinFsp
 /// Results are written as Markdown and JSON to benchmarks/results/.
@@ -146,9 +146,9 @@ internal static class RealBenchmark
 
         // B. Standard rclone mount: rclone defaults (buffer 16M, chunk 128M), no prediction.
         rows.Add(await CloudScenarioAsync(work, server, results, "B standard rclone mount (defaults), cold", standardRclone: true, prediction: false, train: false, prepare: false, level: 2));
-        // C. CLOUDPLAY X, cold: no profile, empty cache, engine on.
-        rows.Add(await CloudScenarioAsync(work, server, results, "C CLOUDPLAY X cold (no profile)", standardRclone: false, prediction: true, train: false, prepare: false, level: 2));
-        // D. CLOUDPLAY X warm: profile from 2 launches (levels 0,1), cache cleared, Optimize & Prepare, then unseen level 2.
+        // C. Cloud-SSD, cold: no profile, empty cache, engine on.
+        rows.Add(await CloudScenarioAsync(work, server, results, "C Cloud-SSD cold (no profile)", standardRclone: false, prediction: true, train: false, prepare: false, level: 2));
+        // D. Cloud-SSD warm: profile from 2 launches (levels 0,1), cache cleared, Optimize & Prepare, then unseen level 2.
         var (d, warm) = await CloudScenarioWithWarmAsync(work, server, results, level: 2);
         rows.Add(d);
         rows.Add(warm);
@@ -280,11 +280,11 @@ internal static class RealBenchmark
             var prepBytes = server.BytesSent;
             var x = await LaunchAsync(host, server, g, level, results);
             var (cpu, peak) = RcloneUsage(host);
-            var d = new Row("D CLOUDPLAY X warm (2 profiled launches, cache cleared, Prepare, unseen level)", x.R.Load, x.R.Startup, x.R.Menu, x.R.Level, x.R.Worst,
+            var d = new Row("D Cloud-SSD warm (2 profiled launches, cache cleared, Prepare, unseen level)", x.R.Load, x.R.Startup, x.R.Menu, x.R.Level, x.R.Worst,
                 x.Bytes, x.Requests, x.Hits, x.Misses, x.Stalls, cpu, peak, prepS, prepBytes, $"readiness: {ReadinessText.Describe(report.Status)}");
             var y = await LaunchAsync(host, server, g, level, results);
             (cpu, peak) = RcloneUsage(host);
-            var warm = new Row("D' CLOUDPLAY X fully warm cache (same level again)", y.R.Load, y.R.Startup, y.R.Menu, y.R.Level, y.R.Worst,
+            var warm = new Row("D' Cloud-SSD fully warm cache (same level again)", y.R.Load, y.R.Startup, y.R.Menu, y.R.Level, y.R.Worst,
                 y.Bytes, y.Requests, y.Hits, y.Misses, y.Stalls, cpu, peak, 0, 0, "everything already cached");
             return (d, warm);
         }

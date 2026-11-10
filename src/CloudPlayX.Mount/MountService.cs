@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Text.Json;
 using CloudPlayX.Core;
 using CloudPlayX.Diagnostics;
@@ -442,7 +442,7 @@ public sealed class RcloneMountService : IAsyncDisposable
         Persist();
     }
 
-    /// <summary>Re-attaches to mounts left running by a previous CLOUDPLAY X instance, or cleans up stale entries.</summary>
+    /// <summary>Re-attaches to mounts left running by a previous Cloud-SSD instance, or cleans up stale entries.</summary>
     public async Task<IReadOnlyList<MountSession>> AdoptExistingAsync(CancellationToken ct = default)
     {
         var adopted = new List<MountSession>();

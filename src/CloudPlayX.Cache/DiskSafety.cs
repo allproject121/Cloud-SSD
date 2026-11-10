@@ -1,4 +1,4 @@
-using CloudPlayX.Core;
+﻿using CloudPlayX.Core;
 
 namespace CloudPlayX.Cache;
 
@@ -20,7 +20,7 @@ public sealed record CacheBudgetDecision(
 /// Turns the user's cache budget into a value rclone can honour without endangering Windows.
 /// rclone's --vfs-cache-max-size is not an instantaneous quota: open files are never evicted and cleanup runs every
 /// poll interval, so the cache can temporarily exceed it. The guard therefore keeps an overrun margin below the free
-/// space reserve and pauses CLOUDPLAY X's own prefetching under disk pressure.
+/// space reserve and pauses Cloud-SSD's own prefetching under disk pressure.
 /// </summary>
 public static class DiskSafetyGuard
 {
@@ -55,12 +55,12 @@ public static class DiskSafetyGuard
         : volumeFree < reserve ? DiskPressure.Low
         : DiskPressure.Normal;
 
-    /// <summary>Whether CLOUDPLAY X may download <paramref name="bytes"/> more speculatively without breaching the reserve.</summary>
+    /// <summary>Whether Cloud-SSD may download <paramref name="bytes"/> more speculatively without breaching the reserve.</summary>
     public static bool MayPrefetch(long bytes, long volumeFree, long reserve) =>
         Pressure(volumeFree, reserve) == DiskPressure.Normal && volumeFree - bytes > reserve;
 }
 
-/// <summary>Cache maintenance that only ever touches folders CLOUDPLAY X created (marker file required).</summary>
+/// <summary>Cache maintenance that only ever touches folders Cloud-SSD created (marker file required).</summary>
 public static class CacheMaintenance
 {
     public const string Marker = ".cloudplayx-cache";
@@ -68,7 +68,7 @@ public static class CacheMaintenance
     public sealed record ClearResult(bool Cleared, long BytesFreed, int DirtyFilesBlocking, string Message);
 
     /// <summary>
-    /// Deletes a mount's cache directory. Refuses when the folder lacks the CLOUDPLAY X marker, is not inside the
+    /// Deletes a mount's cache directory. Refuses when the folder lacks the Cloud-SSD marker, is not inside the
     /// configured cache root, or holds files with pending uploads (unless <paramref name="discardPendingUploads"/>).
     /// Must only be called while the mount is stopped. Never touches cloud data.
     /// </summary>

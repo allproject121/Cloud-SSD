@@ -1,4 +1,4 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;
 using System.Runtime.InteropServices;
@@ -8,7 +8,7 @@ using Microsoft.Win32.SafeHandles;
 
 namespace CloudPlayX.Games;
 
-/// <summary>Tracks a process tree with a Windows Job Object (no kill-on-close: closing CLOUDPLAY X never kills the game).</summary>
+/// <summary>Tracks a process tree with a Windows Job Object (no kill-on-close: closing Cloud-SSD never kills the game).</summary>
 public sealed class ProcessTreeTracker : IDisposable
 {
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]

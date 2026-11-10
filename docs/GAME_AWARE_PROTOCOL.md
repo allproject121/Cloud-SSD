@@ -1,8 +1,8 @@
-# Game-Aware Mode — telemetry protocol
+﻿# Game-Aware Mode — telemetry protocol
 
 Game-Aware Mode lets an **authorized** integration (a game's official modding API, a plugin, or the game's own
-telemetry) tell CLOUDPLAY X where the player is, so data for the current and nearby world regions can be cached
-before it is needed. Without such an integration CLOUDPLAY X uses Universal Mode only and never pretends to know the
+telemetry) tell Cloud-SSD where the player is, so data for the current and nearby world regions can be cached
+before it is needed. Without such an integration Cloud-SSD uses Universal Mode only and never pretends to know the
 player's location.
 
 **Status:** the receiving side (pipe server, region learning, prediction, scheduling, cancellation) is implemented
@@ -12,7 +12,7 @@ and unit-tested with synthetic telemetry. **No game plugin exists yet**; nothing
 
 - Windows named pipe `\\.\pipe\cloudplayx-telemetry-<gameId>` (the game ID is shown in Game settings).
 - Created with `PipeOptions.CurrentUserOnly`: only processes of the same Windows user can connect.
-- The pipe exists only while the game is running from CLOUDPLAY X with Game-Aware enabled for that title.
+- The pipe exists only while the game is running from Cloud-SSD with Game-Aware enabled for that title.
 - One client at a time; reconnecting is allowed.
 
 ## Messages
@@ -34,7 +34,7 @@ and dropped.
 | `fasttravel` | Teleport/fast travel to a region (prefetch for neighbours is cancelled). |
 | `loading` | Optional loading-screen markers (currently logged only). |
 
-Region identifiers must come from the game (zone names, cell IDs, map chunks). CLOUDPLAY X does not infer regions
+Region identifiers must come from the game (zone names, cell IDs, map chunks). Cloud-SSD does not infer regions
 from coordinates on its own.
 
 ## How the data is used
@@ -54,5 +54,5 @@ from coordinates on its own.
 ## Rules for plugin authors
 
 - Use only the game's supported modding/plugin interfaces. Do not inject into games protected by anti-cheat, and do
-  not modify executables or bypass DRM. CLOUDPLAY X will not help circumvent such protections.
+  not modify executables or bypass DRM. Cloud-SSD will not help circumvent such protections.
 - Send coarse data only (position and region). No personal data.

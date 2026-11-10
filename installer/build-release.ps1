@@ -1,6 +1,6 @@
-<#
+﻿<#
 .SYNOPSIS
-  Builds the CLOUDPLAY X release: self-contained win-x64 publish of the desktop app and the cpx CLI into one folder,
+  Builds the Cloud-SSD release: self-contained win-x64 publish of the desktop app and the cpx CLI into one folder,
   bundles the checksum-verified rclone binary, documentation and install/uninstall scripts, and zips the result.
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File installer\build-release.ps1
