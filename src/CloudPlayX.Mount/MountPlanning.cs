@@ -77,8 +77,12 @@ public static class MountFlagBuilder
         if (i.Cache.MinFreeSpaceBytes > 0) Flag("vfs-cache-min-free-space", ByteSize.ToRclone(i.Cache.MinFreeSpaceBytes));
         Flag("vfs-cache-max-age", Dur(i.Cache.MaxAge));
         Flag("vfs-cache-poll-interval", Dur(i.Cache.PollInterval));
-        Flag("buffer-size", ByteSize.ToRclone(i.Cache.BufferSizeBytes > 0 ? i.Cache.BufferSizeBytes : 32 * ByteSize.MiB));
-        Flag("vfs-read-ahead", ByteSize.ToRclone(i.Cache.ReadAheadBytes > 0 ? i.Cache.ReadAheadBytes : 16 * ByteSize.MiB));
+        // 0 is a deliberate default, not "unset": in full cache mode rclone downloads buffer-size + read-ahead past
+        // every read position, so 32Mi + 16Mi turned each small random game read into up to 48 MiB of speculative
+        // download (3 x 64 KiB reads fetched a whole 24 MiB file; BENCHMARKS.md: ~3x slower cold launches). The
+        // prediction engine owns read-ahead; users on very fast links can still raise both in Settings.
+        Flag("buffer-size", ByteSize.ToRclone(i.Cache.BufferSizeBytes));
+        Flag("vfs-read-ahead", ByteSize.ToRclone(i.Cache.ReadAheadBytes));
         Flag("vfs-read-chunk-size", ByteSize.ToRclone(i.Cache.ReadChunkSizeBytes > 0 ? i.Cache.ReadChunkSizeBytes : 8 * ByteSize.MiB));
         var chunkStreams = i.Cache.ReadChunkStreams > 0 ? i.Cache.ReadChunkStreams : 1;
         if (chunkStreams > 1) Flag("vfs-read-chunk-streams", chunkStreams.ToString(CultureInfo.InvariantCulture));
@@ -87,8 +91,14 @@ public static class MountFlagBuilder
         Flag("attr-timeout", "24h");
         Flag("poll-interval", "1m");
         Flag("vfs-fast-fingerprint");
-        Flag("vfs-handle-caching", "30s");
-        Flag("vfs-disk-space-total-size", "15T");
+        // Must match RcloneMountService.HandleCachingWindow (6 s), which graceful unmount and Prepare's readiness check
+        // wait on. rclone writes a file's range index only when the cached handle really closes, and a cached handle
+        // pins the item against eviction ("Grace period item skipped"). With 30s, quitting within 30 s of a read lost
+        // the index (re-download on next start), and under cache/disk pressure rclone reset the file being read
+        // instead of the older, closed ones.
+        Flag("vfs-handle-caching", "5s");
+        // No --vfs-disk-space-total-size: a fixed "15T" made every drive claim 15 TB in File Explorer. Without it rclone
+        // reports the account's real quota (for a combined drive, the sum of its accounts).
         Flag("vfs-refresh");
         Flag("vfs-read-chunk-size-limit", "256Mi");
         Flag("no-checksum");
@@ -112,8 +122,15 @@ public static class MountFlagBuilder
 
         if (i.Network.HardLimitMbps > 0)
             Flag("bwlimit", ((long)Bandwidth.MbpsToBytesPerSecond(i.Network.HardLimitMbps)).ToString(CultureInfo.InvariantCulture) + "B");
-        var tps = i.Network.TpsLimit > 0 ? i.Network.TpsLimit : 10;
-        Flag("tpslimit", tps.ToString(CultureInfo.InvariantCulture));
+        // --tpslimit is one global limiter shared by every HTTP transaction (listings, per-file HEADs, chunk GETs). It
+        // protects Google Drive API quotas, so it applies to Drive only (NetworkSettings default 10) and 0 keeps its
+        // documented meaning "unlimited". Forcing 10 on every remote let the startup directory walks (--vfs-refresh and
+        // the rc vfs/refresh after mount) starve data reads: cold throughput fell to ~20 % of the link, a walk took 25 s
+        // instead of 60 ms, and an in-flight walk delayed rclone's shutdown by ~11 s.
+        // Every cloud API remote keeps the limit, including unions/crypts built on Drive accounts (the real Z: drive is a
+        // union of three); only quota-free HTTP/local sources (the simulated cloud in tests) skip it.
+        if (i.Network.TpsLimit > 0 && i.RemoteType is not ("http" or "local"))
+            Flag("tpslimit", i.Network.TpsLimit.ToString(CultureInfo.InvariantCulture));
 
         Flag("rc");
         Flag("rc-addr", $"127.0.0.1:{i.RcPort}");

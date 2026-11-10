@@ -55,20 +55,20 @@
             <UniformGrid Columns="4">
                 <Border Style="{StaticResource Card}">
                     <StackPanel>
-                        <TextBlock Text="CONNECTION HEALTH" Style="{StaticResource Label}" />
+                        <TextBlock Text="CLOUD DRIVE STATUS" Style="{StaticResource Label}" />
                         <TextBlock Text="{Binding Health}" Style="{StaticResource Body}" FontSize="15" FontWeight="SemiBold" Foreground="{Binding HealthTone, Converter={StaticResource Tone}}" />
                     </StackPanel>
                 </Border>
                 <Border Style="{StaticResource Card}">
                     <StackPanel>
-                        <TextBlock Text="CACHE ON SSD" Style="{StaticResource Label}" />
+                        <TextBlock Text="TEMPORARY STORAGE (OFFLINE)" Style="{StaticResource Label}" />
                         <TextBlock Text="{Binding CacheUsage}" Style="{StaticResource Metric}" />
                         <ProgressBar Value="{Binding CacheFraction}" Maximum="1" Margin="0,8,0,0" />
                     </StackPanel>
                 </Border>
                 <Border Style="{StaticResource Card}">
                     <StackPanel>
-                        <TextBlock Text="CACHE HIT RATE (THIS RUN)" Style="{StaticResource Label}" />
+                        <TextBlock Text="SPEED CACHE HIT RATE" Style="{StaticResource Label}" />
                         <TextBlock Text="{Binding HitRate}" Style="{StaticResource Metric}" />
                     </StackPanel>
                 </Border>
@@ -99,7 +99,8 @@
                 <Border Grid.Column="1" Style="{StaticResource Card}">
                     <StackPanel>
                         <TextBlock Text="Storage" Style="{StaticResource H2}" />
-                        <TextBlock Text="{Binding FreeSpace}" Style="{StaticResource Body}" />
+                        <TextBlock Text="{Binding CloudStorage}" Style="{StaticResource Body}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,6" />
+                        <TextBlock Text="{Binding FreeSpace}" Style="{StaticResource Body}" TextWrapping="Wrap" />
                         <TextBlock Text="{Binding CacheDetail}" Style="{StaticResource Caption}" Margin="0,8,0,0" />
                     </StackPanel>
                 </Border>
@@ -117,10 +118,10 @@
                         <ItemsControl ItemsSource="{Binding Accounts}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <DockPanel Margin="0,4">
-                                        <TextBlock Text="{Binding Key}" FontWeight="SemiBold" Width="140" />
-                                        <TextBlock Text="{Binding Value}" Foreground="{StaticResource Muted}" />
-                                    </DockPanel>
+                                    <StackPanel Margin="0,4">
+                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{Binding Detail}" FontSize="12" Foreground="{Binding Tone, Converter={StaticResource Tone}}" TextWrapping="Wrap" />
+                                    </StackPanel>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>

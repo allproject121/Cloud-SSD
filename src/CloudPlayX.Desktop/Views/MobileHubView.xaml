@@ -55,6 +55,18 @@
                                 <Image Source="{Binding QrCode}" RenderOptions.BitmapScalingMode="NearestNeighbor" />
                             </Border>
 
+                            <!-- Pairing code for the Android app (typed once; the QR code is for a phone's browser) -->
+                            <Border Background="{StaticResource Surface2}" CornerRadius="8" Padding="12,10" Margin="0,0,0,14"
+                                    BorderBrush="{StaticResource Accent}" BorderThickness="1">
+                                <StackPanel HorizontalAlignment="Center">
+                                    <TextBlock Text="PAIRING CODE FOR THE PHONE APP" Style="{StaticResource Label}" HorizontalAlignment="Center" />
+                                    <TextBlock Text="{Binding PairingCode}" FontFamily="Consolas" FontSize="30" FontWeight="Bold"
+                                               Foreground="{StaticResource Accent}" HorizontalAlignment="Center" Margin="0,2,0,2" />
+                                    <TextBlock Text="Phone app me 'Connect to PC' dabao aur ye 6 number daalo. Ek baar use hone ke baad code badal jaata hai."
+                                               TextWrapping="Wrap" TextAlignment="Center" FontSize="11" Foreground="{StaticResource Dim}" />
+                                </StackPanel>
+                            </Border>
+
                             <TextBlock Text="LOCAL ACCESS ADDRESS" Style="{StaticResource Label}" Margin="0,0,0,4" />
                             <TextBox Text="{Binding PairingUrl, Mode=OneWay}" IsReadOnly="True" Margin="0,0,0,10"
                                      FontFamily="Consolas" FontSize="11.5" />
@@ -133,7 +145,7 @@
                             <!-- Action Bar: Count, Open Folder, Clear -->
                             <DockPanel Margin="0,0,0,8" LastChildFill="True">
                                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                                    <Button Content="⚡ Offload to Cloud (Z:)" Command="{Binding OffloadToCloudNowCommand}" Style="{StaticResource Primary}" Padding="8,3" FontSize="11" Margin="0,0,6,0" ToolTip="Offload local files to Cloud Drive (Z:) immediately" />
+                                    <Button Content="⚡ Free Up Space (Z:)" Command="{Binding OffloadToCloudNowCommand}" Style="{StaticResource Primary}" Padding="8,3" FontSize="11" Margin="0,0,6,0" ToolTip="Offload local files to Cloud Drive (Z:) immediately" />
                                     <Button Content="Uploads Folder" Command="{Binding OpenUploadsFolderCommand}" Padding="8,3" FontSize="11" Margin="0,0,6,0" />
                                     <Button Content="Clear History" Command="{Binding ClearTransferHistoryCommand}" Padding="8,3" FontSize="11" />
                                 </StackPanel>

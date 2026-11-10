@@ -6,7 +6,7 @@
         <StackPanel Margin="26,22">
             <TextBlock Text="Connect Cloud Account" Style="{StaticResource H1}" />
             <TextBlock Style="{StaticResource Caption}" Margin="0,0,0,16"
-                       Text="Connect your cloud storage. Cloud Drive mounts your cloud folders as high-speed local virtual drives in Windows File Explorer." />
+                       Text="Sign in to add an account. Its files then appear as a drive in File Explorer. You can add as many accounts as you like, one at a time." />
 
             <!-- Provider Selection Tabs -->
             <Border Background="{StaticResource Surface2}" CornerRadius="10" Padding="4" Margin="0,0,0,16">
@@ -47,22 +47,22 @@
                 </Button>
                 <TextBlock x:Name="ModeText" Style="{StaticResource Caption}" Margin="0,8,0,0" Foreground="{StaticResource Dim}" />
 
-                <!-- Shown when no key file exists yet -->
-                <Border x:Name="GetKeyBox" CornerRadius="8" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Background="{StaticResource Surface}" Padding="14,10" Margin="0,14,0,0">
-                    <StackPanel>
-                        <TextBlock FontWeight="SemiBold" Text="Getting slow drives or “rate limited”? Use your own free Google key (one time):" TextWrapping="Wrap" />
-                        <TextBlock Style="{StaticResource Caption}" Margin="0,4,0,8" TextWrapping="Wrap"
-                                   Text="In Google Cloud: Clients → your Desktop client → Download JSON (or create one: Create client → Desktop app). Cloud Drive finds the file in Downloads automatically." />
-                        <StackPanel Orientation="Horizontal">
-                            <Button Content="1. Open Google Cloud" Click="OpenConsole" />
-                            <Button Content="2. I downloaded it — find key" Click="FindKey" />
-                            <Button Content="Choose file…" Style="{StaticResource Ghost}" Click="LoadKey" />
-                        </StackPanel>
-                    </StackPanel>
-                </Border>
-
-                <CheckBox x:Name="AdvancedBox" Margin="0,10,0,0" Content="Enter a key manually" Checked="AdvancedChanged" Unchecked="AdvancedChanged" />
+                <!-- Everything about Google keys is optional and stays folded away; signing in needs only the button above. -->
+                <CheckBox x:Name="AdvancedBox" Margin="0,14,0,0" Content="Advanced: use my own Google key (optional)" Checked="AdvancedChanged" Unchecked="AdvancedChanged" />
                 <StackPanel x:Name="AdvancedPanel" Visibility="Collapsed" Margin="26,10,0,0">
+                    <!-- Shown when no key file exists yet -->
+                    <Border x:Name="GetKeyBox" CornerRadius="8" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Background="{StaticResource Surface}" Padding="14,10" Margin="0,0,0,14">
+                        <StackPanel>
+                            <TextBlock FontWeight="SemiBold" Text="Your own free Google key (one time) keeps drives fast and working after rclone's shared login is retired:" TextWrapping="Wrap" />
+                            <TextBlock Style="{StaticResource Caption}" Margin="0,4,0,8" TextWrapping="Wrap"
+                                       Text="In Google Cloud: Clients → your Desktop client → Download JSON (or create one: Create client → Desktop app). Cloud-SSD finds the file in Downloads automatically." />
+                            <StackPanel Orientation="Horizontal">
+                                <Button Content="1. Open Google Cloud" Click="OpenConsole" />
+                                <Button Content="2. I downloaded it — find key" Click="FindKey" />
+                                <Button Content="Choose file…" Style="{StaticResource Ghost}" Click="LoadKey" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
                     <TextBlock Text="OAUTH CLIENT ID" Style="{StaticResource Label}" />
                     <TextBox x:Name="ClientIdBox" Margin="0,0,0,10" />
                     <TextBlock Text="OAUTH CLIENT SECRET" Style="{StaticResource Label}" />
@@ -113,7 +113,7 @@
                     <StackPanel>
                         <TextBlock Text="Nextcloud, ownCloud &amp; WebDAV" FontWeight="SemiBold" FontSize="14" />
                         <TextBlock Style="{StaticResource Caption}" Margin="0,4,0,0" TextWrapping="Wrap"
-                                   Text="Mount your private Nextcloud, home NAS, Seedbox, or any standard WebDAV cloud storage." />
+                                   Text="Connect your private Nextcloud, home NAS, Seedbox, or any standard WebDAV cloud storage." />
                     </StackPanel>
                 </Border>
 

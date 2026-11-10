@@ -83,6 +83,8 @@ public partial class App : Application
             {
                 await _host.InitializeAsync();
                 System.IO.File.AppendAllText(dbgLog, $"[{DateTime.Now:O}] Host initialized\n");
+                // Keep exactly the two standard drives (each account / all accounts); also tidies up older layouts.
+                if (_host.Remotes.Count > 0 || _host.Settings.Mounts.Count > 0) await _host.SyncStandardDrivesAsync();
             }
             catch (Exception ex)
             {

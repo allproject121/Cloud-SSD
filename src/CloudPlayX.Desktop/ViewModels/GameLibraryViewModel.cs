@@ -142,8 +142,12 @@ public sealed partial class GameLibraryViewModel : PageViewModel
             Say("Launching. Data that is not cached will be fetched from the cloud on demand — expect loading waits on first launch.", "warn");
         await RunAsync(async () =>
         {
+            // Measured before the launch: the game's own RAM is not what the user can free.
+            var (ram, ramFree) = MemoryHealth.ReadRam();
+            var ramLow = ram > 0 && 1 - (double)ramFree / ram >= MemoryHealth.RamAlmostFullFraction;
             var launch = await Host.PlayAsync(g);
-            Say($"{g.Name} started ({launch.Mode}). Telemetry is being recorded to improve the next launch.", "ok");
+            Say($"{g.Name} started ({launch.Mode}). Telemetry is being recorded to improve the next launch." +
+                (ramLow ? $" RAM is almost full ({ByteSize.Format(ramFree)} free) — close apps on the PC Memory page if the game stutters." : ""), ramLow ? "warn" : "ok");
         });
         OnStateChanged();
     }

@@ -4,17 +4,18 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Cloud-SSD</title>
-  
+
   <!-- PWA Meta Tags -->
-  <meta name="theme-color" content="#0F1117">
+  <meta name="theme-color" content="#121316">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="description" content="Cloud-SSD companion and ultra high-speed mobile bridge">
+  <meta name="description" content="Cloud-SSD phone companion: browse cloud drives, send files to the PC, live storage and gaming HUD">
+  <meta name="referrer" content="no-referrer">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/svg+xml" href="icon-192.svg">
   <link rel="apple-touch-icon" href="icon-192.svg">
-  
-  <link rel="stylesheet" href="app.css?v=0.7.2">
+
+  <link rel="stylesheet" href="app.css?v=0.8.0">
 </head>
 <body>
 
@@ -24,166 +25,116 @@
       <div class="search-icon">
         <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
       </div>
-      <input type="text" id="global-search-input" placeholder="Search Cloud-SSD & Phone..." oninput="handleSearch(this.value)" autocomplete="off">
-      <div id="clear-search-btn" class="clear-search" onclick="clearSearch()" style="display: none;">
+      <input type="text" id="global-search-input" placeholder="Search Cloud SSD &amp; phone" autocomplete="off" enterkeyhint="search">
+      <div id="clear-search-btn" class="clear-search" data-act="search-clear" style="display: none;">
         <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
       </div>
-      <div class="profile-chip" id="profile-chip-btn" onclick="openConnectionModal()" title="PC Connection & Status">
-        <div class="profile-avatar" id="pc-avatar">R</div>
-        <div class="profile-status-dot online" id="header-status-dot"></div>
+      <div class="profile-chip" data-act="open-connection" title="PC connection">
+        <div class="profile-avatar" id="pc-avatar">?</div>
+        <div class="profile-status-dot offline" id="header-status-dot"></div>
       </div>
     </div>
   </div>
 
-  <!-- Floating Download Progress Card -->
-  <div id="download-progress-card" class="download-progress-card" style="display: none;">
-    <div class="dl-progress-top">
-      <div class="dl-progress-icon-box">
-        <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
-      </div>
-      <div class="dl-progress-info">
-        <div class="dl-progress-title" id="dl-file-name">Downloading file...</div>
-        <div class="dl-progress-stats" id="dl-stats">0% • 0.0 MB/s</div>
-      </div>
-      <button class="dl-progress-close" onclick="dismissDownloadCard()" title="Dismiss">
-        <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
-      </button>
+  <!-- "Opened in a browser" banner: hand the pairing over to the installed app, or get the app -->
+  <div id="browser-app-banner" class="app-handoff-banner" style="display: none;">
+    <div class="app-handoff-text">
+      <strong>Cloud-SSD phone app</strong>
+      <span>Phone storage, RAM and send-with-progress work in the app.</span>
     </div>
-    <div class="dl-progress-bar-track">
-      <div class="dl-progress-bar-fill" id="dl-progress-bar" style="width: 0%;"></div>
-    </div>
+    <a class="app-handoff-btn primary" id="open-in-app-link" href="#">Open in app</a>
+    <a class="app-handoff-btn" href="cloudssd.apk" download>Get app</a>
   </div>
+
+  <!-- Search results (covers the tabs while a search is typed) -->
+  <main id="search-panel" class="tab-screen search-panel">
+    <div class="section-container">
+      <div class="section-header">
+        <div class="section-title">Cloud SSD <span class="count-badge" id="search-cloud-count">0</span></div>
+        <div class="section-action" id="search-cloud-where"></div>
+      </div>
+      <div id="search-cloud-results" class="ssd-items-container list-view flush"></div>
+    </div>
+    <div class="section-container" id="search-phone-section">
+      <div class="section-header">
+        <div class="section-title">This phone <span class="count-badge" id="search-phone-count">0</span></div>
+      </div>
+      <div id="search-phone-results" class="phone-file-list"></div>
+    </div>
+  </main>
 
   <!-- ============================================================= -->
-  <!-- TAB 1: HOME (Dashboard with Hardware Widgets, PC Card, Recent) -->
+  <!-- TAB 1: HOME                                                   -->
   <!-- ============================================================= -->
   <main id="tab-home" class="tab-screen active">
 
-    <!-- Active Gaming Mini Banner (if PC game running) -->
-    <div id="home-game-banner" class="mini-hud-banner" style="display: none;" onclick="switchTab('gaming')">
+    <!-- PC game running right now (hidden when none) -->
+    <div id="home-game-banner" class="mini-hud-banner" style="display: none;" data-act="tab" data-tab="gaming">
       <div class="banner-left">
         <div class="game-icon-badge">
           <svg viewBox="0 0 24 24"><path d="M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-10 7H8v3H6v-3H3v-2h3V8h2v3h3v2zm4.5 2c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm4-3c-.83 0-1.5-.67-1.5-1.5S18.67 9 19.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
         </div>
         <div>
-          <div class="banner-title" id="banner-game-name">PC Game Running</div>
-          <div class="banner-sub"><span id="banner-fps">75</span> FPS • <span id="banner-ssd">112</span> MB/s SSD Read</div>
+          <div class="banner-title" id="banner-game-name">Game running</div>
+          <div class="banner-sub" id="banner-game-sub">Playing on the PC</div>
         </div>
       </div>
       <div class="banner-chip">LIVE HUD</div>
     </div>
 
-    <!-- Hardware / Storage Widgets Grid (As sketched: Phone Ram, Storage, SSD, SSD) -->
+    <!-- Live tiles: phone RAM, phone storage, cloud storage, PC drives -->
     <div class="section-container">
       <div class="section-header">
-        <div class="section-title">System & Storage</div>
-        <div class="section-action" onclick="refreshAllWidgets()">Live</div>
+        <div class="section-title">System &amp; Storage</div>
+        <div class="section-action live-tag"><span class="live-indicator-dot"></span>Live</div>
       </div>
       <div class="hardware-widgets-grid">
-        <!-- Widget 1: Phone RAM -->
-        <div class="hw-widget-card" onclick="openPhoneStatsModal()">
+        <div class="hw-widget-card" data-act="open-ram">
           <div class="hw-widget-top">
             <div class="hw-icon-box ram-icon">
               <svg viewBox="0 0 24 24"><path d="M2 9v2h2v2H2v2h2v2H2v2h2c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2h2v-2h-2v-2h2v-2h-2V9h2V7h-2c0-1.1-.9-2-2-2H6c-1.1 0-2 .9-2 2H2v2h2zm4-2h12v12H6V7zm3 2h6v6H9V9z"/></svg>
             </div>
-            <span class="hw-badge" id="hw-ram-pct">52%</span>
+            <span class="hw-badge" id="hw-ram-pct">—</span>
           </div>
           <div class="hw-widget-label">Phone RAM</div>
-          <div class="hw-widget-val" id="hw-ram-val">4.2 / 8 GB</div>
-          <div class="hw-widget-bar"><div class="hw-widget-bar-fill" id="hw-ram-bar" style="width: 52%;"></div></div>
+          <div class="hw-widget-val" id="hw-ram-val">—</div>
+          <div class="hw-widget-bar"><div class="hw-widget-bar-fill" id="hw-ram-bar" style="width: 0%;"></div></div>
         </div>
 
-        <!-- Widget 2: Phone Storage -->
-        <div class="hw-widget-card" onclick="switchTab('browser')">
+        <div class="hw-widget-card" data-act="open-storage">
           <div class="hw-widget-top">
             <div class="hw-icon-box storage-icon">
               <svg viewBox="0 0 24 24"><path d="M17 1.01L7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z"/></svg>
             </div>
-            <span class="hw-badge" id="hw-phone-free">84 GB Free</span>
+            <span class="hw-badge" id="hw-phone-free">—</span>
           </div>
           <div class="hw-widget-label">Phone Storage</div>
-          <div class="hw-widget-val" id="hw-phone-val">172 / 256 GB</div>
-          <div class="hw-widget-bar"><div class="hw-widget-bar-fill storage" id="hw-phone-bar" style="width: 67%;"></div></div>
+          <div class="hw-widget-val" id="hw-phone-val">—</div>
+          <div class="hw-widget-bar"><div class="hw-widget-bar-fill storage" id="hw-phone-bar" style="width: 0%;"></div></div>
         </div>
 
-        <!-- Widget 3: Cloud SSD 15TB -->
-        <div class="hw-widget-card" onclick="switchTab('ssd')">
+        <div class="hw-widget-card" data-act="open-cloud">
           <div class="hw-widget-top">
             <div class="hw-icon-box ssd-icon">
               <svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM19 18H6c-2.21 0-4-1.79-4-4 0-2.05 1.53-3.76 3.56-3.97l1.07-.11.5-.95C8.08 7.14 9.94 6 12 6c2.62 0 4.88 1.86 5.39 4.43l.3 1.5 1.53.11c1.56.1 2.78 1.41 2.78 2.96 0 1.65-1.35 3-3 3z"/></svg>
             </div>
-            <span class="hw-badge online">Z: 15TB</span>
+            <span class="hw-badge" id="hw-ssd-badge">—</span>
           </div>
           <div class="hw-widget-label">Cloud SSD</div>
-          <div class="hw-widget-val" id="hw-ssd-val">15.0 TB NVMe</div>
-          <div class="hw-widget-bar"><div class="hw-widget-bar-fill ssd" style="width: 98%;"></div></div>
+          <div class="hw-widget-val" id="hw-ssd-val">—</div>
+          <div class="hw-widget-bar"><div class="hw-widget-bar-fill ssd" id="hw-ssd-bar" style="width: 0%;"></div></div>
         </div>
 
-        <!-- Widget 4: PC System / Drives -->
-        <div class="hw-widget-card" onclick="openConnectionModal()">
+        <div class="hw-widget-card" data-act="open-drives">
           <div class="hw-widget-top">
             <div class="hw-icon-box pc-icon">
               <svg viewBox="0 0 24 24"><path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/></svg>
             </div>
-            <span class="hw-badge online" id="hw-pc-status-badge">ROSHAN</span>
+            <span class="hw-badge" id="hw-pc-status-badge">—</span>
           </div>
-          <div class="hw-widget-label">PC System</div>
-          <div class="hw-widget-val" id="hw-pc-drives-val">2 Drives (Z:, G:)</div>
-          <div class="hw-widget-bar"><div class="hw-widget-bar-fill pc" style="width: 100%;"></div></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- PC Connection Live Card (Dedicated design with Connect / Disconnect button) -->
-    <div class="section-container">
-      <div class="pc-connection-banner-card" id="home-connection-card">
-        <div class="pc-conn-left">
-          <div class="pc-conn-icon-halo" id="home-conn-halo">
-            <svg viewBox="0 0 24 24"><path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/></svg>
-            <div class="pc-conn-pulse-dot" id="home-conn-dot"></div>
-          </div>
-          <div class="pc-conn-info">
-            <div class="pc-conn-title" id="home-conn-title">Connected to ROSHAN</div>
-            <div class="pc-conn-sub" id="home-conn-sub">192.168.0.102:8090 • Wi-Fi LAN (Zero Data)</div>
-            <div class="pc-conn-pills-row">
-              <span class="pc-conn-pill" id="home-conn-time">Connected for 1h 45m</span>
-              <span class="pc-conn-pill speed" id="home-conn-speed">~100 MB/s</span>
-              <span class="pc-conn-pill ping" id="home-conn-ping">2 ms ping</span>
-            </div>
-          </div>
-        </div>
-        <div class="pc-conn-actions">
-          <button class="pc-conn-toggle-btn disconnect" id="home-conn-toggle-btn" onclick="togglePcConnection(event)">
-            Disconnect
-          </button>
-          <button class="pc-conn-details-btn" onclick="openConnectionModal()" title="Connection Settings">
-            <svg viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Laptop Smart Storage Saver Card -->
-    <div class="section-container" id="laptop-storage-saver-card">
-      <div class="pc-connection-banner-card" style="border: 1px solid rgba(168, 199, 250, 0.25); background: rgba(22, 27, 34, 0.9);">
-        <div class="pc-conn-left">
-          <div class="pc-conn-icon-halo" style="background: rgba(168, 199, 250, 0.12); color: #A8C7FA;">
-            <svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13h-3v4h-2v-4H6l5-5 5 5h-2z"/></svg>
-          </div>
-          <div class="pc-conn-info">
-            <div class="pc-conn-title">Laptop Storage Saver</div>
-            <div class="pc-conn-sub" id="laptop-storage-sub">Auto-shifts local files to Cloud Drive (Z:) when space is low</div>
-            <div class="pc-conn-pills-row">
-              <span class="pc-conn-pill speed" id="laptop-free-pill">-- GB Free</span>
-              <span class="pc-conn-pill" id="laptop-threshold-pill">Limit: 15 GB</span>
-              <span class="pc-conn-pill ping" id="laptop-status-pill">Active</span>
-            </div>
-          </div>
-        </div>
-        <div class="pc-conn-actions">
-          <button class="pc-conn-toggle-btn" style="background: #0078D4; color: white; padding: 7px 12px; font-size: 12px; border-radius: 8px; border: none; font-weight: 600;" onclick="triggerLaptopOffloadNow(event)">
-            Offload Now
-          </button>
+          <div class="hw-widget-label">PC Drives</div>
+          <div class="hw-widget-val" id="hw-pc-drives-val">—</div>
+          <div class="hw-widget-bar"><div class="hw-widget-bar-fill pc" id="hw-pc-bar" style="width: 0%;"></div></div>
         </div>
       </div>
     </div>
@@ -191,627 +142,633 @@
     <!-- Quick Action Shortcut Chips -->
     <div class="section-container">
       <div class="quick-action-strip">
-        <button class="quick-chip-btn primary" onclick="pickAndSendToPc('photos')">
+        <button class="quick-chip-btn primary" data-act="send" data-kind="photos">
           <svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
           <span>Send Photos to PC</span>
         </button>
-        <button class="quick-chip-btn" onclick="pickAndSendToPc('all')">
-          <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+        <button class="quick-chip-btn" data-act="send" data-kind="all">
+          <svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>
           <span>Send Any File</span>
         </button>
-        <button class="quick-chip-btn" onclick="switchTab('ssd')">
+        <button class="quick-chip-btn" data-act="tab" data-tab="ssd">
           <svg viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
           <span>Browse Cloud SSD</span>
         </button>
       </div>
     </div>
 
-    <!-- Recent Section (As sketched: Recent with [ ] [ ] [ ] [ ] horizontal cards) -->
-    <div class="section-container" id="recent-section">
+    <!-- Transfers: what is moving right now, then what moved recently -->
+    <div class="section-container" id="transfers-section">
       <div class="section-header">
-        <div class="section-title">Recent Files</div>
-        <div class="section-action" onclick="refreshRecentFiles()">Refresh</div>
+        <div class="section-title"><span class="live-indicator-dot" id="transfers-live-dot" style="display: none;"></span>Transfers</div>
+        <div class="section-action" data-act="open-transfers">See all</div>
       </div>
-      <div class="recent-scroll-row" id="recent-scroll-container">
-        <!-- Rendered dynamically via app.js -->
-        <div class="recent-empty-card">
-          <div class="recent-empty-icon">
-            <svg viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+      <div id="transfers-active" class="transfers-active-list"></div>
+      <div id="transfers-recent" class="transfers-history-cards">
+        <div class="recent-empty-card">Nothing sent yet. Use "Send Any File" to send something to the PC.</div>
+      </div>
+    </div>
+    <!-- PC connection card -->
+    <div class="section-container">
+      <div class="pc-connection-banner-card" id="home-connection-card" data-act="open-connection">
+        <div class="pc-conn-left">
+          <div class="pc-conn-icon-halo">
+            <svg viewBox="0 0 24 24"><path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/></svg>
+            <div class="pc-conn-pulse-dot offline" id="home-conn-dot"></div>
           </div>
-          <div>Loading recent files...</div>
+          <div class="pc-conn-info">
+            <div class="pc-conn-title" id="home-conn-title">Not connected</div>
+            <div class="pc-conn-sub" id="home-conn-sub">Looking for your PC…</div>
+            <div class="pc-conn-pills-row">
+              <span class="pc-conn-pill" id="home-conn-time">—</span>
+              <span class="pc-conn-pill ping" id="home-conn-ping" style="display: none;"></span>
+            </div>
+          </div>
+        </div>
+        <div class="pc-conn-actions">
+          <button class="pc-conn-toggle-btn connect" id="home-conn-toggle-btn" data-act="toggle-link">Connect</button>
         </div>
       </div>
     </div>
+
+    <!-- Laptop Smart Storage Saver Card -->
+    <div class="section-container" id="laptop-storage-saver-card" style="display: none;">
+      <div class="pc-connection-banner-card saver-card">
+        <div class="pc-conn-left">
+          <div class="pc-conn-icon-halo saver-halo">
+            <svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13h-3v4h-2v-4H6l5-5 5 5h-2z"/></svg>
+          </div>
+          <div class="pc-conn-info">
+            <div class="pc-conn-title">Laptop Space Saver</div>
+            <div class="pc-conn-sub" id="laptop-storage-sub">Moves old files to the cloud drive when the laptop is nearly full</div>
+            <div class="pc-conn-pills-row">
+              <span class="pc-conn-pill speed" id="laptop-free-pill">—</span>
+              <span class="pc-conn-pill" id="laptop-threshold-pill">—</span>
+              <span class="pc-conn-pill ping" id="laptop-status-pill">—</span>
+            </div>
+          </div>
+        </div>
+        <div class="pc-conn-actions">
+          <button class="pc-conn-toggle-btn saver-btn" data-act="offload-now">Free Up Space</button>
+        </div>
+      </div>
+    </div>
+
   </main>
 
   <!-- ============================================================= -->
-  <!-- TAB 2: BROWSER (Phone Folder & Real Phone Storage Categories)  -->
+  <!-- TAB 2: PHONE (files on this phone)                            -->
   <!-- ============================================================= -->
   <main id="tab-browser" class="tab-screen">
-    
-    <!-- Phone Permission Banner (Live prompt for full phone access) -->
+
+    <!-- Shown when Android has not given this app access to files yet -->
     <div id="phone-perm-banner" class="phone-permission-card" style="display: none;">
       <div class="perm-card-icon">
         <svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
       </div>
       <div class="perm-card-body">
-        <div class="perm-card-title">Enable Phone Storage Access</div>
-        <div class="perm-card-sub">Allow Cloud-SSD to show all live photos, videos, and downloaded files on this phone.</div>
-        <button class="perm-grant-btn" onclick="requestPhonePermissions()">Grant Permission</button>
+        <div class="perm-card-title" id="phone-perm-title">Allow access to phone files</div>
+        <div class="perm-card-sub" id="phone-perm-sub">Needed to show your folders, documents and downloads.</div>
+        <button class="perm-grant-btn" data-act="grant-storage" id="phone-perm-btn">Allow</button>
       </div>
     </div>
 
-    <!-- Active Media Player Streaming Mini Screen (As sketched: Small screen of streaming) -->
-    <div id="browser-media-mini" class="mini-media-card" style="display: none;">
-      <div class="mini-media-icon">
-        <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
-      </div>
-      <div class="mini-media-details">
-        <div class="mini-media-title" id="mini-media-title">Track Name</div>
-        <div class="mini-media-sub" id="mini-media-sub">Streaming from Cloud SSD</div>
-      </div>
-      <button class="mini-media-btn" onclick="openActiveMediaViewer()">View</button>
+    <!-- Only in a web browser: phone files need the app -->
+    <div id="phone-webonly-note" class="recent-empty-card" style="display: none;">
+      Files on this phone can only be shown by the Cloud-SSD Android app.
+      <a class="app-handoff-btn primary" href="cloudssd.apk" download style="margin-top: 12px;">Download the app</a>
     </div>
 
-    <!-- Categories Grid (As sketched: Download, Images, Video, Audio, Document, Apps, Starred, Safe folder) -->
-    <div class="section-container">
-      <div class="section-header">
-        <div class="section-title">Categories (Phone Storage)</div>
-        <div class="section-action" onclick="refreshPhoneCategories()">Scan</div>
+    <!-- View A: categories + storage, like the phone's own Files app -->
+    <div id="phone-home">
+      <div class="section-container">
+        <div class="section-header">
+          <div class="section-title">Categories</div>
+          <div class="section-action" data-act="phone-rescan">Refresh</div>
+        </div>
+        <div class="categories-grid-m3">
+          <div class="cat-grid-card" data-act="phone-cat" data-cat="downloads" data-title="Downloads">
+            <div class="cat-grid-icon-box cat-downloads"><svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg></div>
+            <div class="cat-grid-name">Downloads</div>
+            <div class="cat-grid-meta" id="cat-stat-downloads">—</div>
+          </div>
+          <div class="cat-grid-card" data-act="phone-cat" data-cat="images" data-title="Images">
+            <div class="cat-grid-icon-box cat-images"><svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg></div>
+            <div class="cat-grid-name">Images</div>
+            <div class="cat-grid-meta" id="cat-stat-images">—</div>
+          </div>
+          <div class="cat-grid-card" data-act="phone-cat" data-cat="videos" data-title="Videos">
+            <div class="cat-grid-icon-box cat-videos"><svg viewBox="0 0 24 24"><path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/></svg></div>
+            <div class="cat-grid-name">Videos</div>
+            <div class="cat-grid-meta" id="cat-stat-videos">—</div>
+          </div>
+          <div class="cat-grid-card" data-act="phone-cat" data-cat="audio" data-title="Audio">
+            <div class="cat-grid-icon-box cat-audio"><svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg></div>
+            <div class="cat-grid-name">Audio</div>
+            <div class="cat-grid-meta" id="cat-stat-audio">—</div>
+          </div>
+          <div class="cat-grid-card" data-act="phone-cat" data-cat="documents" data-title="Documents">
+            <div class="cat-grid-icon-box cat-docs"><svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg></div>
+            <div class="cat-grid-name">Documents</div>
+            <div class="cat-grid-meta" id="cat-stat-documents">—</div>
+          </div>
+          <div class="cat-grid-card" data-act="phone-cat" data-cat="apps" data-title="APKs &amp; archives">
+            <div class="cat-grid-icon-box cat-apps"><svg viewBox="0 0 24 24"><path d="M4 8h4V4H4v4zm6 12h4v-4h-4v4zm-6 0h4v-4H4v4zm0-6h4v-4H4v4zm6 0h4v-4h-4v4zm6-10v4h4V4h-4zm-6 4h4V4h-4v4zm6 6h4v-4h-4v4zm0 6h4v-4h-4v4z"/></svg></div>
+            <div class="cat-grid-name">APKs &amp; archives</div>
+            <div class="cat-grid-meta" id="cat-stat-apps">—</div>
+          </div>
+          <div class="cat-grid-card" data-act="phone-starred">
+            <div class="cat-grid-icon-box cat-starred"><svg viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg></div>
+            <div class="cat-grid-name">Starred</div>
+            <div class="cat-grid-meta" id="cat-stat-starred">—</div>
+          </div>
+          <div class="cat-grid-card" data-act="phone-dir" data-path="">
+            <div class="cat-grid-icon-box cat-safe"><svg viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg></div>
+            <div class="cat-grid-name">Internal storage</div>
+            <div class="cat-grid-meta">All folders</div>
+          </div>
+        </div>
       </div>
 
-      <div class="categories-grid-m3">
-        <!-- 1. Downloads -->
-        <div class="cat-grid-card" onclick="openPhoneCategory('downloads', 'Downloads')">
-          <div class="cat-grid-icon-box cat-downloads">
-            <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+      <!-- Real storage breakdown (tap for details) -->
+      <div class="section-container">
+        <div class="storage-usage-panel" data-act="open-storage">
+          <div class="storage-usage-top">
+            <div class="storage-usage-title" id="browser-storage-title">Phone storage</div>
+            <div class="storage-usage-free" id="browser-storage-free">—</div>
           </div>
-          <div class="cat-grid-name">Downloads</div>
-          <div class="cat-grid-meta" id="cat-stat-downloads">Offline & Received</div>
-        </div>
-
-        <!-- 2. Images -->
-        <div class="cat-grid-card" onclick="openPhoneCategory('images', 'Images')">
-          <div class="cat-grid-icon-box cat-images">
-            <svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
-          </div>
-          <div class="cat-grid-name">Images</div>
-          <div class="cat-grid-meta" id="cat-stat-images">Photos & Shots</div>
-        </div>
-
-        <!-- 3. Videos -->
-        <div class="cat-grid-card" onclick="openPhoneCategory('videos', 'Videos')">
-          <div class="cat-grid-icon-box cat-videos">
-            <svg viewBox="0 0 24 24"><path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/></svg>
-          </div>
-          <div class="cat-grid-name">Videos</div>
-          <div class="cat-grid-meta" id="cat-stat-videos">Clips & Movies</div>
-        </div>
-
-        <!-- 4. Audio -->
-        <div class="cat-grid-card" onclick="openPhoneCategory('audio', 'Audio')">
-          <div class="cat-grid-icon-box cat-audio">
-            <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
-          </div>
-          <div class="cat-grid-name">Audio</div>
-          <div class="cat-grid-meta" id="cat-stat-audio">Music & Notes</div>
-        </div>
-
-        <!-- 5. Documents -->
-        <div class="cat-grid-card" onclick="openPhoneCategory('docs', 'Documents')">
-          <div class="cat-grid-icon-box cat-docs">
-            <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
-          </div>
-          <div class="cat-grid-name">Documents</div>
-          <div class="cat-grid-meta" id="cat-stat-docs">PDFs & Docs</div>
-        </div>
-
-        <!-- 6. Apps -->
-        <div class="cat-grid-card" onclick="openPhoneCategory('apps', 'Apps')">
-          <div class="cat-grid-icon-box cat-apps">
-            <svg viewBox="0 0 24 24"><path d="M4 8h4V4H4v4zm6 12h4v-4h-4v4zm-6 0h4v-4H4v4zm0-6h4v-4H4v4zm6 0h4v-4h-4v4zm6-10v4h4V4h-4zm-6 4h4V4h-4v4zm6 6h4v-4h-4v4zm0 6h4v-4h-4v4z"/></svg>
-          </div>
-          <div class="cat-grid-name">Apps</div>
-          <div class="cat-grid-meta" id="cat-stat-apps">APKs & Packages</div>
-        </div>
-
-        <!-- 7. Starred -->
-        <div class="cat-grid-card" onclick="openStarredFiles()">
-          <div class="cat-grid-icon-box cat-starred">
-            <svg viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
-          </div>
-          <div class="cat-grid-name">Starred</div>
-          <div class="cat-grid-meta">Favorites</div>
-        </div>
-
-        <!-- 8. Safe folder -->
-        <div class="cat-grid-card" onclick="openSafeFolder()">
-          <div class="cat-grid-icon-box cat-vault">
-            <svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
-          </div>
-          <div class="cat-grid-name">Safe folder</div>
-          <div class="cat-grid-meta">Protected Vault</div>
+          <div class="storage-segmented-bar" id="browser-storage-bar"></div>
+          <div class="storage-legend-row" id="browser-storage-legend"></div>
         </div>
       </div>
     </div>
 
-    <!-- Phone Storage Distribution Bar -->
-    <div class="section-container">
-      <div class="storage-usage-panel">
-        <div class="storage-usage-top">
-          <div class="storage-usage-title" id="browser-storage-title">Phone Internal Storage</div>
-          <div class="storage-usage-free" id="browser-storage-free">84.2 GB free</div>
-        </div>
-        <div class="storage-segmented-bar">
-          <div class="bar-seg seg-images" id="seg-images" style="width: 25%;"></div>
-          <div class="bar-seg seg-videos" id="seg-videos" style="width: 30%;"></div>
-          <div class="bar-seg seg-audio" id="seg-audio" style="width: 10%;"></div>
-          <div class="bar-seg seg-docs" id="seg-docs" style="width: 8%;"></div>
-          <div class="bar-seg seg-other" id="seg-other" style="width: 27%;"></div>
-        </div>
-        <div class="storage-legend-row">
-          <span><span class="legend-dot img"></span> Images</span>
-          <span><span class="legend-dot vid"></span> Videos</span>
-          <span><span class="legend-dot aud"></span> Audio</span>
-          <span><span class="legend-dot doc"></span> Docs</span>
-          <span><span class="legend-dot oth"></span> System</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Phone Internal Folders List -->
-    <div class="section-container">
-      <div class="section-header">
-        <div class="section-title">Internal Storage Folders</div>
-      </div>
-      <div class="phone-folders-list">
-        <div class="phone-folder-row" onclick="openPhoneFolderView('Download')">
-          <div class="pf-icon"><svg viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg></div>
-          <div class="pf-text">
-            <div class="pf-name">Download</div>
-            <div class="pf-sub">Offline downloads & PC received files</div>
-          </div>
-          <div class="pf-arrow"><svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg></div>
-        </div>
-        <div class="phone-folder-row" onclick="openPhoneFolderView('DCIM')">
-          <div class="pf-icon"><svg viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg></div>
-          <div class="pf-text">
-            <div class="pf-name">DCIM / Camera</div>
-            <div class="pf-sub">Camera photos and screenshots</div>
-          </div>
-          <div class="pf-arrow"><svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg></div>
-        </div>
-        <div class="phone-folder-row" onclick="openPhoneFolderView('Documents')">
-          <div class="pf-icon"><svg viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg></div>
-          <div class="pf-text">
-            <div class="pf-name">Documents</div>
-            <div class="pf-sub">PDFs, books and office files</div>
-          </div>
-          <div class="pf-arrow"><svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Phone Live Downloads List Container -->
-    <div class="section-container" id="phone-downloads-container">
-      <div class="section-header">
-        <div class="section-title">Phone Downloads</div>
-        <div class="section-action" onclick="loadPhoneDownloadsList()">Refresh</div>
-      </div>
-      <div id="phone-downloads-list" class="phone-file-list">
-        <!-- Rendered dynamically -->
-        <div class="empty-state-text">Scanning Phone Downloads...</div>
-      </div>
-    </div>
-  </main>
-
-  <!-- ============================================================= -->
-  <!-- TAB 3: SSD (PC Cloud-SSD 15TB File Folder Explorer)           -->
-  <!-- ============================================================= -->
-  <main id="tab-ssd" class="tab-screen">
-    
-    <!-- SSD Top Bar: Drive Selectors & Actions -->
-    <div class="ssd-top-bar">
-      <!-- Drive Selector Pills -->
-      <div class="ssd-drives-strip" id="ssd-drives-strip">
-        <button class="ssd-drive-pill active" id="pill-drive-z" onclick="selectDrive('Z:\\')">
-          <svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z"/></svg>
-          <span>Z: Cloud-SSD 15TB</span>
-        </button>
-        <button class="ssd-drive-pill" id="pill-drive-g" onclick="selectDrive('G:\\')">
-          <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-          <span>G: Google Drive</span>
-        </button>
-      </div>
-
-      <!-- Breadcrumbs Path & Back Action -->
-      <div class="ssd-path-bar">
-        <button class="ssd-back-btn" id="ssd-back-btn" onclick="navigateSsdBack()" title="Back">
+    <!-- View B: one folder or one category -->
+    <div id="phone-list" style="display: none;">
+      <div class="phone-nav-bar sticky-bar">
+        <button class="phone-back-btn" data-act="phone-back" title="Back">
           <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
         </button>
-        <div class="ssd-path-text" id="ssd-breadcrumbs-path">Z:\</div>
+        <div class="phone-path-wrap">
+          <div class="phone-path-title" id="phone-list-title">Internal storage</div>
+          <div class="phone-path-text" id="phone-current-path"></div>
+        </div>
+        <button class="phone-back-btn" data-act="phone-select" id="phone-select-btn" title="Select files">Select</button>
+        <button class="phone-back-btn" data-act="phone-layout" title="Grid / list">
+          <svg viewBox="0 0 24 24"><path d="M4 11h5V5H4v6zm0 7h5v-6H4v6zm6 0h5v-6h-5v6zm6 0h5v-6h-5v6zm-6-7h5V5h-5v6zm6-6v6h5V5h-5z"/></svg>
+        </button>
+      </div>
+      <div id="phone-explorer-container" class="phone-file-list"></div>
+    </div>
+  </main>
+
+  <!-- ============================================================= -->
+  <!-- TAB 3: CLOUD SSD (drives on the PC)                           -->
+  <!-- ============================================================= -->
+  <main id="tab-ssd" class="tab-screen">
+    <div class="ssd-top-bar">
+      <div class="ssd-drives-strip" id="ssd-drives-strip"></div>
+      <div class="ssd-path-bar">
+        <button class="ssd-back-btn" id="ssd-back-btn" data-act="ssd-up" title="Up">
+          <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+        </button>
+        <div class="ssd-path-text breadcrumbs" id="ssd-breadcrumbs-path"></div>
         <div class="ssd-view-controls">
-          <button class="ssd-icon-btn" id="ssd-sort-btn" onclick="toggleSortMenu()" title="Sort">
+          <button class="ssd-icon-btn" data-act="ssd-refresh" title="Refresh" id="ssd-refresh-btn">
+            <svg viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+          </button>
+          <button class="ssd-icon-btn" data-act="ssd-sort" title="Sort">
             <svg viewBox="0 0 24 24"><path d="M3 18h6v-2H3v2zM3 6v2h18V6H3zm0 7h12v-2H3v2z"/></svg>
           </button>
-          <button class="ssd-icon-btn" id="ssd-layout-btn" onclick="toggleViewLayout()" title="Grid / List View">
-            <svg viewBox="0 0 24 24" id="layout-icon-svg"><path d="M4 11h5V5H4v6zm0 7h5v-6H4v6zm6 0h5v-6h-5v6zm6 0h5v-6h-5v6zm-6-7h5V5h-5v6zm6-6v6h5V5h-5z"/></svg>
+          <button class="ssd-icon-btn" data-act="ssd-layout" title="Grid / list">
+            <svg viewBox="0 0 24 24"><path d="M4 11h5V5H4v6zm0 7h5v-6H4v6zm6 0h5v-6h-5v6zm6 0h5v-6h-5v6zm-6-7h5V5h-5v6zm6-6v6h5V5h-5z"/></svg>
           </button>
         </div>
       </div>
     </div>
-
-    <!-- SSD Items List / Grid Container -->
-    <div class="ssd-items-wrapper">
-      <div class="ssd-items-container list-view" id="ssd-items-container">
-        <!-- Rendered dynamically via app.js -->
-        <div class="empty-state-text" style="padding: 40px 16px;">Loading Cloud-SSD files...</div>
-      </div>
-    </div>
+    <div class="ssd-items-container list-view" id="ssd-items-container"></div>
   </main>
 
   <!-- ============================================================= -->
-  <!-- TAB 4: GAMING (PC Gaming Companion & Live HUD)                -->
+  <!-- TAB 4: GAMING (PC live HUD + media remote)                    -->
   <!-- ============================================================= -->
   <main id="tab-gaming" class="tab-screen">
-    <!-- Live Gaming HUD Card -->
     <div class="gaming-hero-card">
       <div class="gaming-hero-top">
-        <div>
-          <span class="gaming-badge" id="gaming-status-badge">CONNECTED</span>
+        <div class="gaming-hero-text">
+          <span class="gaming-badge offline" id="gaming-status-badge">OFFLINE</span>
           <div class="gaming-title" id="gaming-hero-title">PC Gaming Companion</div>
+          <div class="gaming-sub" id="gaming-hero-sub">Live numbers from your PC</div>
         </div>
-        <button class="gaming-refresh-btn" onclick="pollGamingHud()">Refresh</button>
+        <div class="section-action live-tag" id="gaming-live-tag"><span class="live-indicator-dot"></span>Live</div>
       </div>
-
-      <!-- Real-Time Metrics Strip -->
       <div class="gaming-metrics-grid">
-        <div class="gm-card">
-          <div class="gm-val" id="hud-fps-val">--</div>
-          <div class="gm-label">FPS Target</div>
-        </div>
-        <div class="gm-card">
-          <div class="gm-val" id="hud-ssd-read">0.0</div>
-          <div class="gm-label">MB/s SSD Read</div>
-        </div>
-        <div class="gm-card">
-          <div class="gm-val" id="hud-cache-hit">98.4%</div>
-          <div class="gm-label">VFS Cache Hit</div>
-        </div>
-        <div class="gm-card">
-          <div class="gm-val" id="hud-ping-val">2 ms</div>
-          <div class="gm-label">Wi-Fi Latency</div>
-        </div>
+        <div class="gm-card"><div class="gm-val" id="hud-cpu-val">—</div><div class="gm-label" id="hud-cpu-label">CPU load</div></div>
+        <div class="gm-card"><div class="gm-val" id="hud-gpu-val">—</div><div class="gm-label">GPU load</div></div>
+        <div class="gm-card"><div class="gm-val" id="hud-ram-val">—</div><div class="gm-label">PC RAM used</div></div>
+        <div class="gm-card"><div class="gm-val" id="hud-ssd-read">—</div><div class="gm-label">Cloud read MB/s</div></div>
+        <div class="gm-card"><div class="gm-val" id="hud-cache-hit">—</div><div class="gm-label">Cache hits</div></div>
+        <div class="gm-card"><div class="gm-val" id="hud-ping-val">—</div><div class="gm-label">Wi-Fi latency</div></div>
       </div>
     </div>
 
-    <!-- PC Remote Controls -->
     <div class="section-container">
-      <div class="section-title">PC Remote Controls</div>
+      <div class="section-header"><div class="section-title">PC media remote</div></div>
       <div class="remote-controls-grid">
-        <button class="remote-btn" onclick="pcRemoteAction('volup')">
-          <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
-          <span>Volume +</span>
+        <button class="remote-btn" data-act="remote" data-key="voldown">
+          <svg viewBox="0 0 24 24"><path d="M18.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM5 9v6h4l5 5V4L9 9H5z"/></svg><span>Volume −</span>
         </button>
-        <button class="remote-btn" onclick="pcRemoteAction('voldown')">
-          <svg viewBox="0 0 24 24"><path d="M18.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM5 9v6h4l5 5V4L9 9H5z"/></svg>
-          <span>Volume -</span>
+        <button class="remote-btn" data-act="remote" data-key="volup">
+          <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg><span>Volume +</span>
         </button>
-        <button class="remote-btn" onclick="pcRemoteAction('mute')">
-          <svg viewBox="0 0 24 24"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>
-          <span>Mute PC</span>
+        <button class="remote-btn" data-act="remote" data-key="mute">
+          <svg viewBox="0 0 24 24"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg><span>Mute</span>
         </button>
-        <button class="remote-btn" onclick="pcRemoteAction('playpause')">
-          <svg viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
-          <span>Play / Pause</span>
+        <button class="remote-btn" data-act="remote" data-key="prev">
+          <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg><span>Previous</span>
+        </button>
+        <button class="remote-btn" data-act="remote" data-key="playpause">
+          <svg viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg><span>Play / Pause</span>
+        </button>
+        <button class="remote-btn" data-act="remote" data-key="next">
+          <svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg><span>Next</span>
         </button>
       </div>
     </div>
 
-    <!-- Game Saves Manager -->
     <div class="section-container">
       <div class="section-header">
-        <div class="section-title">Cloud Game Saves</div>
-        <div class="section-action" onclick="loadGameSaves()">Refresh</div>
+        <div class="section-title">Game save backups on the PC</div>
+        <div class="section-action" data-act="saves-refresh">Refresh</div>
       </div>
-      <div id="game-saves-list" class="activity-history-box">
-        <div class="empty-state-text">Scanning game saves from PC...</div>
-      </div>
+      <div id="game-saves-list" class="transfers-history-cards"></div>
     </div>
   </main>
 
-  <!-- Floating Action Button (FAB) -->
-  <button class="material-fab" onclick="triggerFileUpload()" title="Send files to PC">
-    <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+  <!-- Selection bar for "Select" mode in phone files -->
+  <div id="phone-select-bar" class="select-bar" style="display: none;">
+    <span id="phone-select-count">0 selected</span>
+    <button class="select-bar-btn" data-act="phone-select-cancel">Cancel</button>
+    <button class="select-bar-btn primary" data-act="phone-select-send">Send to PC</button>
+  </div>
+
+  <!-- Running transfer, visible on every tab -->
+  <div id="transfer-pill" class="transfer-pill" data-act="transfer-pill" style="display: none;">
+    <div class="transfer-pill-fill"></div>
+    <span class="transfer-pill-text"></span>
+  </div>
+
+  <!-- Floating Action Button: send files to the PC -->
+  <button class="material-fab" id="main-fab" data-act="send" data-kind="all" title="Send files to PC">
+    <svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>
   </button>
 
-  <!-- Hidden File Input Controls -->
-  <input type="file" id="file-uploader" style="display: none;" onchange="handleFileSelection(event)" multiple>
-  <input type="file" id="photo-uploader" accept="image/*,video/*" style="display: none;" onchange="handleFileSelection(event)" multiple>
+  <!-- Hidden file inputs (used only in a web browser; the app uses Android's picker) -->
+  <input type="file" id="file-uploader" style="display: none;" multiple>
+  <input type="file" id="photo-uploader" accept="image/*,video/*" style="display: none;" multiple>
 
-  <!-- Bottom Navigation Bar (4 Authentic Tabs as sketched: Home, Browser, SSD, Gaming) -->
+  <!-- Bottom Navigation Bar -->
   <nav class="material-bottom-nav">
-    <!-- 1. Home -->
-    <button class="nav-tab active" id="nav-home" onclick="switchTab('home')">
-      <div class="nav-icon-indicator">
-        <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
-      </div>
+    <button class="nav-tab active" id="nav-home" data-act="tab" data-tab="home">
+      <div class="nav-icon-indicator"><svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg></div>
       <span class="nav-label">Home</span>
     </button>
-
-    <!-- 2. Browser (Phone Folder) -->
-    <button class="nav-tab" id="nav-browser" onclick="switchTab('browser')">
-      <div class="nav-icon-indicator">
-        <svg viewBox="0 0 24 24"><path d="M17 1.01L7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z"/></svg>
-      </div>
-      <span class="nav-label">Browser</span>
+    <button class="nav-tab" id="nav-browser" data-act="tab" data-tab="browser">
+      <div class="nav-icon-indicator"><svg viewBox="0 0 24 24"><path d="M17 1.01L7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z"/></svg></div>
+      <span class="nav-label">Phone</span>
     </button>
-
-    <!-- 3. SSD (Cloud-SSD File Folder) -->
-    <button class="nav-tab" id="nav-ssd" onclick="switchTab('ssd')">
-      <div class="nav-icon-indicator">
-        <svg viewBox="0 0 24 24"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/></svg>
-      </div>
+    <button class="nav-tab" id="nav-ssd" data-act="tab" data-tab="ssd">
+      <div class="nav-icon-indicator"><svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z"/></svg></div>
       <span class="nav-label">Cloud SSD</span>
     </button>
-
-    <!-- 4. Gaming Companion -->
-    <button class="nav-tab" id="nav-gaming" onclick="switchTab('gaming')">
-      <div class="nav-icon-indicator">
-        <svg viewBox="0 0 24 24"><path d="M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-10 7H8v3H6v-3H3v-2h3V8h2v3h3v2zm4.5 2c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm4-3c-.83 0-1.5-.67-1.5-1.5S18.67 9 19.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
-      </div>
+    <button class="nav-tab" id="nav-gaming" data-act="tab" data-tab="gaming">
+      <div class="nav-icon-indicator"><svg viewBox="0 0 24 24"><path d="M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-10 7H8v3H6v-3H3v-2h3V8h2v3h3v2zm4.5 2c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm4-3c-.83 0-1.5-.67-1.5-1.5S18.67 9 19.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg></div>
       <span class="nav-label">Gaming</span>
     </button>
   </nav>
 
   <!-- ============================================================= -->
-  <!-- MODAL: PC Connection & Settings Sheet (Dedicated High-End Design) -->
+  <!-- PAIRING: shown until this phone is paired with a PC           -->
   <!-- ============================================================= -->
-  <div id="connection-modal" class="modal-backdrop" onclick="closeConnectionModal(event)">
-    <div class="connection-modal-sheet" onclick="event.stopPropagation()">
+  <div id="pair-overlay" class="pair-overlay" style="display: none;">
+    <div class="pair-card">
+      <div class="pair-logo">
+        <svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z"/></svg>
+      </div>
+      <div class="pair-title">Connect to your PC</div>
+      <div class="pair-sub">On the PC open <strong>Cloud-SSD → Phone</strong>. It shows a 6-digit <strong>pairing code</strong>. Phone and PC must be on the same Wi-Fi (or the PC on this phone's hotspot).</div>
+
+      <div class="pair-step-label">1 · Your PC</div>
+      <div id="pair-pc-list" class="pair-pc-list"></div>
+      <div class="pair-row">
+        <input type="text" id="pair-address" class="modal-input" placeholder="or type the PC address, e.g. 192.168.1.5" inputmode="url" autocomplete="off">
+        <button class="modal-btn-sm" data-act="pair-rescan" id="pair-rescan-btn">Search</button>
+      </div>
+
+      <div class="pair-step-label">2 · Pairing code from the PC</div>
+      <input type="text" id="pair-code" class="modal-input pair-code-input" placeholder="000 000" inputmode="numeric" maxlength="7" autocomplete="one-time-code">
+
+      <div id="pair-error" class="pair-error" style="display: none;"></div>
+      <button class="conn-master-btn connect" data-act="pair-submit" id="pair-submit-btn">Connect</button>
+      <button class="pair-skip-btn" data-act="pair-close" id="pair-close-btn">Not now</button>
+    </div>
+  </div>
+
+  <!-- ============================================================= -->
+  <!-- SHEET: PC connection                                          -->
+  <!-- ============================================================= -->
+  <div id="connection-modal" class="modal-backdrop sheet" data-act="sheet-close">
+    <div class="connection-modal-sheet">
       <div class="m3-drag-handle"></div>
-      
       <div class="conn-modal-header">
-        <div class="conn-modal-icon-wrap" id="modal-status-halo">
+        <div class="conn-modal-icon-wrap">
           <svg viewBox="0 0 24 24"><path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/></svg>
-          <div class="conn-modal-pulse-dot" id="modal-status-dot"></div>
+          <div class="conn-modal-pulse-dot offline" id="modal-status-dot"></div>
         </div>
         <div class="conn-modal-header-info">
-          <div class="conn-modal-title" id="modal-pc-name">ROSHAN</div>
-          <div class="conn-modal-sub" id="modal-pc-os">Windows 11 • Cloud-SSD Engine</div>
-          <div class="conn-status-tag connected" id="modal-status-tag">Connected & Synced</div>
+          <div class="conn-modal-title" id="modal-pc-name">No PC</div>
+          <div class="conn-modal-sub" id="modal-pc-os">Cloud-SSD</div>
+          <div class="conn-status-tag offline" id="modal-status-tag">Not connected</div>
         </div>
-        <button class="conn-modal-close" onclick="closeConnectionModal()">
+        <button class="conn-modal-close" data-act="sheet-close-btn">
           <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
         </button>
       </div>
 
-      <!-- Live Connection Stats Strip -->
       <div class="conn-details-list">
-        <div class="conn-row">
-          <span class="conn-row-label">Connected Since ("Kabse hai")</span>
-          <strong class="conn-row-val highlight" id="modal-conn-uptime">Connected for 1h 45m 20s</strong>
-        </div>
-        <div class="conn-row">
-          <span class="conn-row-label">Local PC Address</span>
-          <span class="conn-row-val mono" id="modal-pc-ip">192.168.0.102:8090</span>
-        </div>
-        <div class="conn-row">
-          <span class="conn-row-label">Phone IP Address</span>
-          <span class="conn-row-val mono" id="modal-phone-ip">192.168.0.109</span>
-        </div>
-        <div class="conn-row">
-          <span class="conn-row-label">Network & Bandwidth</span>
-          <span class="conn-row-val">Local Wi-Fi • Zero Data (~100 MB/s)</span>
-        </div>
-        <div class="conn-row">
-          <span class="conn-row-label">Wi-Fi Ping & Latency</span>
-          <div class="conn-ping-wrap">
-            <span class="conn-row-val" id="modal-ping-val">2 ms</span>
-            <button class="conn-ping-btn" onclick="testLivePing()">Test Ping</button>
-          </div>
-        </div>
-        <div class="conn-row">
-          <span class="conn-row-label">Mounted Storage</span>
-          <span class="conn-row-val">Z: Cloud-SSD (15 TB) • G: Google Drive</span>
-        </div>
+        <div class="conn-row"><span class="conn-row-label">Connected for</span><strong class="conn-row-val highlight" id="modal-conn-uptime">—</strong></div>
+        <div class="conn-row"><span class="conn-row-label">PC address</span><span class="conn-row-val mono" id="modal-pc-ip">—</span></div>
+        <div class="conn-row"><span class="conn-row-label">This phone</span><span class="conn-row-val mono" id="modal-phone-ip">—</span></div>
+        <div class="conn-row"><span class="conn-row-label">Latency (live)</span><span class="conn-row-val" id="modal-ping-val">—</span></div>
+        <div class="conn-row"><span class="conn-row-label">Drives on the PC</span><span class="conn-row-val" id="modal-drives-val">—</span></div>
+        <div class="conn-row"><span class="conn-row-label">Sent / received this PC session</span><span class="conn-row-val" id="modal-bytes-val">—</span></div>
       </div>
 
-      <!-- Master Disconnect / Reconnect Button -->
       <div class="conn-modal-cta">
-        <button class="conn-master-btn disconnect" id="modal-connect-btn" onclick="togglePcConnection(event)">
-          Disconnect from PC
-        </button>
+        <button class="conn-master-btn connect" id="modal-connect-btn" data-act="toggle-link">Connect to PC</button>
       </div>
 
-      <!-- Custom IP Switch & Pairing Token Section -->
       <div class="conn-settings-fold">
-        <div class="conn-fold-title">Custom IP / Switch PC</div>
+        <div class="conn-fold-title">Another PC or a new address</div>
         <div class="conn-input-row">
-          <input type="text" id="manual-server-ip" class="modal-input" placeholder="192.168.0.102:8090">
-          <button class="modal-btn-sm" onclick="saveManualServerIp()">Save</button>
+          <input type="text" id="manual-server-ip" class="modal-input" placeholder="192.168.1.5:8090" inputmode="url" autocomplete="off">
+          <button class="modal-btn-sm" data-act="save-address">Save</button>
         </div>
-        <div class="conn-fold-sub">Pairing Token: <code id="modal-pairing-token">cloudssd2026</code></div>
+        <div class="conn-fold-actions">
+          <button class="drive-btn browse" data-act="find-pc">Find my PC again</button>
+          <button class="drive-btn unmount" data-act="unpair">Unpair this phone</button>
+        </div>
+        <div class="conn-fold-sub" id="modal-app-version"></div>
       </div>
     </div>
   </div>
 
   <!-- ============================================================= -->
-  <!-- MODAL: Material 3 File Action Bottom Sheet                    -->
+  <!-- SHEET: file actions (cloud file or phone file)                -->
   <!-- ============================================================= -->
-  <div id="file-actions-sheet" class="m3-bottom-sheet-backdrop" onclick="closeFileActionsSheet(event)">
-    <div class="m3-bottom-sheet" onclick="event.stopPropagation()">
+  <div id="file-actions-sheet" class="m3-bottom-sheet-backdrop" data-act="sheet-close">
+    <div class="m3-bottom-sheet">
       <div class="m3-drag-handle"></div>
-      
-      <!-- File Header -->
       <div class="m3-sheet-file-header">
         <div class="m3-sheet-file-icon" id="sheet-file-icon"></div>
         <div class="m3-sheet-file-details">
-          <div class="m3-sheet-file-name" id="sheet-file-name">Document.pdf</div>
-          <div class="m3-sheet-file-meta" id="sheet-file-meta">126 KB • Cloud-SSD</div>
+          <div class="m3-sheet-file-name" id="sheet-file-name">File</div>
+          <div class="m3-sheet-file-meta" id="sheet-file-meta"></div>
         </div>
       </div>
-
-      <!-- Quick Action Buttons Strip -->
-      <div class="m3-sheet-actions-grid">
-        <button class="m3-action-item" id="sheet-btn-open" onclick="sheetActionOpen()">
-          <div class="m3-action-icon-circle" style="background: rgba(66, 133, 244, 0.15); color: #4285F4;">
-            <svg viewBox="0 0 24 24"><path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
-          </div>
-          <span id="sheet-open-label">Open in App</span>
-        </button>
-
-        <button class="m3-action-item" id="sheet-btn-open-pc" onclick="sheetActionOpenOnPc()">
-          <div class="m3-action-icon-circle" style="background: rgba(52, 168, 83, 0.15); color: #34A853;">
-            <svg viewBox="0 0 24 24"><path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/></svg>
-          </div>
-          <span>Open on PC</span>
-        </button>
-
-        <button class="m3-action-item" id="sheet-btn-download" onclick="sheetActionDownload()">
-          <div class="m3-action-icon-circle" style="background: rgba(251, 188, 4, 0.15); color: #FBBC04;">
-            <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
-          </div>
-          <span>Save to Phone</span>
-        </button>
-
-        <button class="m3-action-item" id="sheet-btn-open-with" onclick="sheetActionOpenWith()">
-          <div class="m3-action-icon-circle" style="background: rgba(168, 85, 247, 0.15); color: #A855F7;">
-            <svg viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92c0-1.61-1.31-2.92-2.92-2.92z"/></svg>
-          </div>
-          <span>Open with…</span>
-        </button>
-
-        <button class="m3-action-item" id="sheet-btn-star" onclick="sheetActionToggleStar()">
-          <div class="m3-action-icon-circle" id="sheet-star-icon-circle">
-            <svg viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
-          </div>
-          <span id="sheet-star-label">Star</span>
-        </button>
-      </div>
-
-      <!-- Secondary Detailed List Options -->
-      <div class="m3-sheet-list">
-        <div class="m3-sheet-row" onclick="sheetActionOpenOnPc()">
-          <svg viewBox="0 0 24 24"><path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/></svg>
-          <div class="m3-sheet-row-text">
-            <div>Open on PC Desktop</div>
-            <div class="m3-sheet-row-sub">Launch in Windows default application</div>
-          </div>
-        </div>
-
-        <div class="m3-sheet-row" onclick="sheetActionOpenWith()">
-          <svg viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/></svg>
-          <div class="m3-sheet-row-text">
-            <div>Open with other App…</div>
-            <div class="m3-sheet-row-sub">Choose VLC, MX Player, Photos, Adobe, etc.</div>
-          </div>
-        </div>
-
-        <div class="m3-sheet-row" onclick="sheetActionDownload()">
-          <svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/></svg>
-          <div class="m3-sheet-row-text">
-            <div>Save to Phone Storage</div>
-            <div class="m3-sheet-row-sub">Keep in Android Downloads folder</div>
-          </div>
-        </div>
-
-        <div class="m3-sheet-row" onclick="sheetActionShowInfo()">
-          <svg viewBox="0 0 24 24"><path d="M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>
-          <div class="m3-sheet-row-text">
-            <div>File info & Details</div>
-            <div class="m3-sheet-row-sub" id="sheet-file-path-sub">Path on Cloud-SSD</div>
-          </div>
-        </div>
-      </div>
+      <div class="m3-sheet-list" id="sheet-actions-list"></div>
     </div>
   </div>
 
   <!-- ============================================================= -->
-  <!-- MODAL: Universal Media & File Viewer                          -->
+  <!-- MODAL: viewer (video, image, audio, text)                     -->
   <!-- ============================================================= -->
-  <div id="file-viewer-modal" class="modal-backdrop" onclick="closeViewerModal(event)">
-    <div class="viewer-modal-card" onclick="event.stopPropagation()">
+  <div id="file-viewer-modal" class="modal-backdrop" data-act="sheet-close">
+    <div class="viewer-modal-card">
       <div class="viewer-modal-header">
-        <button class="viewer-btn-icon" onclick="closeViewerModal()" title="Back / Close">
+        <button class="viewer-btn-icon" data-act="sheet-close-btn" title="Close">
           <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
         </button>
         <div class="viewer-header-info">
-          <div class="viewer-title" id="viewer-filename">File Name</div>
-          <div class="viewer-sub" id="viewer-meta">Size • Drive</div>
+          <div class="viewer-title" id="viewer-filename">File</div>
+          <div class="viewer-sub" id="viewer-meta"></div>
         </div>
         <div class="viewer-header-actions">
-          <button class="viewer-btn-icon" onclick="openWithCurrentFile()" title="Open in System App">
-            <svg viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92c0-1.61-1.31-2.92-2.92-2.92z"/></svg>
-          </button>
-          <button class="viewer-btn-icon" onclick="openOnPcCurrentFile()" title="Open on PC">
-            <svg viewBox="0 0 24 24"><path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/></svg>
-          </button>
-          <button class="viewer-btn-icon" onclick="downloadCurrentFile()" title="Save to Phone">
-            <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+          <button class="viewer-btn-icon" data-act="viewer-more" title="More">
+            <svg viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
           </button>
         </div>
       </div>
-
-      <!-- Video Content View -->
       <div id="viewer-section-video" class="viewer-section" style="display: none;">
         <video id="native-video-player" class="video-view" controls playsinline></video>
       </div>
-
-      <!-- Image Content View -->
       <div id="viewer-section-image" class="viewer-section" style="display: none;">
-        <div class="image-viewer-wrap">
-          <img id="viewer-image-elem" src="" alt="Photo preview" class="viewer-img" />
-        </div>
+        <div class="image-viewer-wrap"><img id="viewer-image-elem" alt="" class="viewer-img"></div>
       </div>
-
-      <!-- Audio Content View -->
       <div id="viewer-section-audio" class="viewer-section" style="display: none;">
         <div class="audio-viewer-card">
-          <div class="audio-viewer-art">
-            <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
-          </div>
-          <div class="audio-viewer-title" id="viewer-audio-title">Song Title</div>
-          <div class="audio-viewer-sub" id="viewer-audio-sub">Audio Streaming</div>
-          <audio id="viewer-audio-player" class="audio-control-bar" controls playsinline></audio>
+          <div class="audio-viewer-art"><svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg></div>
+          <div class="audio-viewer-title" id="viewer-audio-title"></div>
+          <audio id="viewer-audio-player" class="audio-control-bar" controls></audio>
         </div>
       </div>
-
-      <!-- Text / Code Preview View -->
       <div id="viewer-section-text" class="viewer-section" style="display: none;">
-        <div class="text-preview-card">
-          <pre id="viewer-text-content" class="text-preview-code"></pre>
-        </div>
+        <div class="text-preview-card"><pre id="viewer-text-content" class="text-preview-code"></pre></div>
       </div>
-
-      <!-- Generic Document View -->
       <div id="viewer-section-generic" class="viewer-section" style="display: none;">
         <div class="generic-viewer-card">
           <div class="generic-viewer-icon" id="viewer-generic-icon"></div>
-          <div class="generic-viewer-name" id="viewer-generic-name">File.ext</div>
-          <div class="generic-viewer-sub" id="viewer-generic-sub">Ready to open or stream</div>
-          <div class="generic-viewer-actions">
-            <button class="m3-filled-btn" onclick="openWithCurrentFile()">
-              <svg viewBox="0 0 24 24"><path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
-              <span>Open with App</span>
-            </button>
-            <button class="m3-tonal-btn" onclick="openOnPcCurrentFile()">
-              <svg viewBox="0 0 24 24"><path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/></svg>
-              <span>Open on PC</span>
-            </button>
-            <button class="m3-tonal-btn" onclick="downloadCurrentFile()">
-              <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
-              <span>Save to Phone</span>
-            </button>
-          </div>
+          <div class="generic-viewer-name" id="viewer-generic-name"></div>
+          <div class="generic-viewer-sub">No built-in preview for this kind of file</div>
+          <div class="generic-viewer-actions" id="viewer-generic-actions"></div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Toast Notification -->
-  <div id="toast" class="toast">Connected</div>
+  <!-- ============================================================= -->
+  <!-- SHEET: phone RAM, live                                        -->
+  <!-- ============================================================= -->
+  <div id="ram-breakdown-modal" class="modal-backdrop sheet" data-act="sheet-close">
+    <div class="connection-modal-sheet">
+      <div class="m3-drag-handle"></div>
+      <div class="conn-modal-header">
+        <div class="conn-modal-icon-wrap ram-tint">
+          <svg viewBox="0 0 24 24"><path d="M2 9v2h2v2H2v2h2v2H2v2h2c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2h2v-2h-2v-2h2v-2h-2V9h2V7h-2c0-1.1-.9-2-2-2H6c-1.1 0-2 .9-2 2H2v2h2zm4-2h12v12H6V7zm3 2h6v6H9V9z"/></svg>
+        </div>
+        <div class="conn-modal-header-info">
+          <div class="conn-modal-title">Phone RAM</div>
+          <div class="conn-modal-sub" id="ram-device-sub">Where the memory is right now</div>
+          <div class="conn-status-tag connected"><span class="live-indicator-dot"></span>Live · updates every second</div>
+        </div>
+        <button class="conn-modal-close" data-act="sheet-close-btn">
+          <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </div>
 
-  <script src="app.js?v=0.7.2"></script>
+      <div class="ram-sheet-hero">
+        <div class="ram-hero-numbers">
+          <div><div class="ram-hero-big" id="ram-val-used">—</div><div class="ram-hero-cap">in use</div></div>
+          <div><div class="ram-hero-big" id="ram-val-free">—</div><div class="ram-hero-cap">available</div></div>
+          <div><div class="ram-hero-big" id="ram-val-total">—</div><div class="ram-hero-cap">total</div></div>
+        </div>
+        <div class="ram-bar-visual" id="ram-bar"></div>
+      </div>
+
+      <div class="usage-rows" id="ram-rows"></div>
+      <div class="sheet-note" id="ram-note"></div>
+    </div>
+  </div>
+
+  <!-- ============================================================= -->
+  <!-- SHEET: phone storage, like Settings → Storage                 -->
+  <!-- ============================================================= -->
+  <div id="storage-modal" class="modal-backdrop sheet" data-act="sheet-close">
+    <div class="connection-modal-sheet">
+      <div class="m3-drag-handle"></div>
+      <div class="conn-modal-header">
+        <div class="conn-modal-icon-wrap storage-tint">
+          <svg viewBox="0 0 24 24"><path d="M17 1.01L7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z"/></svg>
+        </div>
+        <div class="conn-modal-header-info">
+          <div class="conn-modal-title">Phone storage</div>
+          <div class="conn-modal-sub" id="storage-device-sub">Internal storage</div>
+          <div class="conn-status-tag connected" id="storage-scan-tag"><span class="live-indicator-dot"></span>Live</div>
+        </div>
+        <button class="conn-modal-close" data-act="sheet-close-btn">
+          <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </div>
+
+      <div class="ram-sheet-hero">
+        <div class="ram-hero-numbers">
+          <div><div class="ram-hero-big" id="storage-val-used">—</div><div class="ram-hero-cap">used</div></div>
+          <div><div class="ram-hero-big" id="storage-val-free">—</div><div class="ram-hero-cap">free</div></div>
+          <div><div class="ram-hero-big" id="storage-val-total">—</div><div class="ram-hero-cap">total</div></div>
+        </div>
+        <div class="ram-bar-visual" id="storage-bar"></div>
+      </div>
+
+      <div class="usage-rows" id="storage-rows"></div>
+      <div class="sheet-note" id="storage-note"></div>
+      <button class="conn-master-btn tonal" data-act="phone-dir" data-path="">Browse internal storage</button>
+    </div>
+  </div>
+
+  <!-- ============================================================= -->
+  <!-- SHEET: cloud storage (accounts and space)                     -->
+  <!-- ============================================================= -->
+  <div id="cloud-modal" class="modal-backdrop sheet" data-act="sheet-close">
+    <div class="connection-modal-sheet">
+      <div class="m3-drag-handle"></div>
+      <div class="conn-modal-header">
+        <div class="conn-modal-icon-wrap cloud-tint">
+          <svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z"/></svg>
+        </div>
+        <div class="conn-modal-header-info">
+          <div class="conn-modal-title">Cloud SSD</div>
+          <div class="conn-modal-sub" id="cloud-sub">Space in your cloud accounts</div>
+          <div class="conn-status-tag connected" id="cloud-live-tag"><span class="live-indicator-dot"></span>Live from the PC</div>
+        </div>
+        <button class="conn-modal-close" data-act="sheet-close-btn">
+          <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </div>
+
+      <div class="ram-sheet-hero">
+        <div class="ram-hero-numbers">
+          <div><div class="ram-hero-big" id="cloud-val-used">—</div><div class="ram-hero-cap">used</div></div>
+          <div><div class="ram-hero-big" id="cloud-val-free">—</div><div class="ram-hero-cap">free</div></div>
+          <div><div class="ram-hero-big" id="cloud-val-total">—</div><div class="ram-hero-cap">total</div></div>
+        </div>
+        <div class="ram-bar-visual" id="cloud-bar"></div>
+      </div>
+
+      <div class="sheet-subtitle">Accounts</div>
+      <div class="usage-rows" id="cloud-accounts"></div>
+      <div class="sheet-subtitle">Drives on the PC</div>
+      <div id="cloud-drives"></div>
+      <div class="sheet-note" id="cloud-note"></div>
+    </div>
+  </div>
+
+  <!-- ============================================================= -->
+  <!-- SHEET: PC drives (connect / disconnect)                       -->
+  <!-- ============================================================= -->
+  <div id="drives-manager-modal" class="modal-backdrop sheet" data-act="sheet-close">
+    <div class="connection-modal-sheet">
+      <div class="m3-drag-handle"></div>
+      <div class="conn-modal-header">
+        <div class="conn-modal-icon-wrap pc-tint">
+          <svg viewBox="0 0 24 24"><path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/></svg>
+        </div>
+        <div class="conn-modal-header-info">
+          <div class="conn-modal-title">PC drives</div>
+          <div class="conn-modal-sub" id="drives-sub">Cloud drives and disks on the PC</div>
+          <div class="conn-status-tag connected"><span class="live-indicator-dot"></span>Live from the PC</div>
+        </div>
+        <button class="conn-modal-close" data-act="sheet-close-btn">
+          <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </div>
+      <div id="drives-list-container"></div>
+    </div>
+  </div>
+
+  <!-- ============================================================= -->
+  <!-- SHEET: all transfers                                          -->
+  <!-- ============================================================= -->
+  <div id="transfers-modal" class="modal-backdrop sheet" data-act="sheet-close">
+    <div class="connection-modal-sheet">
+      <div class="m3-drag-handle"></div>
+      <div class="conn-modal-header">
+        <div class="conn-modal-icon-wrap">
+          <svg viewBox="0 0 24 24"><path d="M9 3L5 6.99h3V14h2V6.99h3L9 3zm7 14.01V10h-2v7.01h-3L15 21l4-3.99h-3z"/></svg>
+        </div>
+        <div class="conn-modal-header-info">
+          <div class="conn-modal-title">Transfers</div>
+          <div class="conn-modal-sub" id="transfers-sub">Between this phone and the PC</div>
+        </div>
+        <button class="conn-modal-close" data-act="sheet-close-btn">
+          <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </div>
+      <div id="transfers-modal-active" class="transfers-active-list"></div>
+      <div class="transfer-chips-row" id="transfers-filter-row">
+        <button class="transfer-chip active" data-act="transfers-filter" data-filter="all">All</button>
+        <button class="transfer-chip" data-act="transfers-filter" data-filter="upload">Sent to PC</button>
+        <button class="transfer-chip" data-act="transfers-filter" data-filter="download">Saved to phone</button>
+        <button class="transfer-chip" data-act="transfers-filter" data-filter="stream">Streamed</button>
+      </div>
+      <div id="transfers-modal-list" class="transfers-history-cards"></div>
+    </div>
+  </div>
+
+  <!-- ============================================================= -->
+  <!-- SHEET: sort (Cloud SSD)                                       -->
+  <!-- ============================================================= -->
+  <div id="sort-sheet" class="m3-bottom-sheet-backdrop" data-act="sheet-close">
+    <div class="m3-bottom-sheet">
+      <div class="m3-drag-handle"></div>
+      <div class="sheet-subtitle">Sort by</div>
+      <div class="m3-sheet-list" id="sort-options"></div>
+    </div>
+  </div>
+
+  <!-- Confirm dialog (real actions on the PC ask first) -->
+  <div id="confirm-modal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-title" id="confirm-title">Are you sure?</div>
+      <div class="confirm-text" id="confirm-text"></div>
+      <div class="confirm-actions">
+        <button class="m3-tonal-btn" data-act="confirm-no">Cancel</button>
+        <button class="m3-filled-btn" data-act="confirm-yes" id="confirm-yes-btn">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="app.js?v=0.8.0"></script>
 </body>
 </html>

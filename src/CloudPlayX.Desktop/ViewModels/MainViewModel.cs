@@ -14,13 +14,10 @@ public sealed partial class MainViewModel : ObservableObject
         {
             new DashboardViewModel(host, Navigate),
             new CloudDrivesViewModel(host),
-            new GameLibraryViewModel(host),
             new MobileHubViewModel(host),
-            new AcceleratorViewModel(host),
-            new SmartCacheViewModel(host),
-            new PerformanceViewModel(host),
+            new GameLibraryViewModel(host),
+            new MemoryViewModel(host),
             new SettingsViewModel(host),
-            new DiagnosticsViewModel(host),
         };
         _selected = Pages[0];
         host.StateChanged += () => Ui(() =>
@@ -39,7 +36,8 @@ public sealed partial class MainViewModel : ObservableObject
     public ObservableCollection<PageViewModel> Pages { get; }
 
     [ObservableProperty] private PageViewModel _selected;
-    [ObservableProperty] private string _drivesStatus = "No drives mounted";
+    [ObservableProperty] private string _storageSummary = "";
+    [ObservableProperty] private string _drivesStatus = "No drives connected";
     [ObservableProperty] private string _rateStatus = "";
     [ObservableProperty] private string _engineStatus = "";
     [ObservableProperty] private string _gameStatus = "";
@@ -53,14 +51,58 @@ public sealed partial class MainViewModel : ObservableObject
 
     public void Navigate(string title)
     {
+        if (title.Contains("Cache", StringComparison.OrdinalIgnoreCase) || title.Contains("Storage", StringComparison.OrdinalIgnoreCase))
+        {
+            var s = Pages.OfType<SettingsViewModel>().FirstOrDefault();
+            if (s != null)
+            {
+                s.SwitchSubTab("Storage");
+                Selected = s;
+                return;
+            }
+        }
+        if (title.Contains("Accelerator", StringComparison.OrdinalIgnoreCase) || title.Contains("Speed", StringComparison.OrdinalIgnoreCase))
+        {
+            var s = Pages.OfType<SettingsViewModel>().FirstOrDefault();
+            if (s != null)
+            {
+                s.SwitchSubTab("Speed");
+                Selected = s;
+                return;
+            }
+        }
+        if (title.Contains("Performance", StringComparison.OrdinalIgnoreCase))
+        {
+            var s = Pages.OfType<SettingsViewModel>().FirstOrDefault();
+            if (s != null)
+            {
+                s.SwitchSubTab("Performance");
+                Selected = s;
+                return;
+            }
+        }
+        if (title.Contains("Diagnostics", StringComparison.OrdinalIgnoreCase) || title.Contains("Log", StringComparison.OrdinalIgnoreCase))
+        {
+            var s = Pages.OfType<SettingsViewModel>().FirstOrDefault();
+            if (s != null)
+            {
+                s.SwitchSubTab("Advanced");
+                Selected = s;
+                return;
+            }
+        }
         var p = Pages.FirstOrDefault(x => x.Title.Equals(title, StringComparison.OrdinalIgnoreCase) || x.Title.Contains(title, StringComparison.OrdinalIgnoreCase));
         if (p != null) Selected = p;
     }
 
     private void UpdateStatus(EngineMetrics m)
     {
+        // Real total over the connected accounts (asked from the provider), not a fixed marketing figure.
+        StorageSummary = Host.Remotes.Count == 0 ? "No cloud account connected"
+            : AccountText.Totals(Host) is { } t ? $"{ByteSize.Format(t.Total)} cloud · {t.Accounts} account(s)"
+            : $"{Host.Remotes.Count(r => !AppHost.IsGeneratedType(r.Type))} account(s) connected";
         var sessions = Host.Mounts.Sessions;
-        DrivesStatus = sessions.Count == 0 ? "No drives mounted"
+        DrivesStatus = sessions.Count == 0 ? "No drives connected"
             : string.Join("  ", sessions.Select(s => $"{s.DriveLetter}: {s.State}"));
         RateStatus = m.DownloadBytesPerSec is { } r ? $"↓ {Bandwidth.BytesPerSecondToMbps(r):0.0} Mbps" : "";
         EngineStatus = Host.DiskPressure ? "Prefetch paused (disk space)" : Host.Engine.Scheduler.Active > 0 ? $"Prefetching ({Host.Engine.Queue.Count} queued)" : "";

@@ -52,6 +52,11 @@ public sealed class AppHost : IAsyncDisposable
         Metrics = new MetricsCollector(this);
         Pins = new PinKeeper(PinnedTargets);
 
+        Archives = new ArchiveWarmer(
+            id => Mounts.Get(id) is { State: MountState.Mounted } s ? s.Root : null, id => Mounts.Get(id)?.Attribution,
+            // Never while a game runs (its reads come first) or while the cache disk is short of space.
+            () => _diskPressure || CurrentLaunch is { State: LaunchState.Running }, LoggerFactory.CreateLogger<ArchiveWarmer>());
+        Mounts.DirectoryListed += Archives.OnDirectoryListed;
         Mounts.ReadObserved += Engine.OnAccess;
         Mounts.LookupObserved += (mount, path, off, present, pre) => Engine.OnLookup(mount, path, off, present, pre);
         Mounts.StatusChanged += s =>
@@ -93,10 +98,19 @@ public sealed class AppHost : IAsyncDisposable
     public FullLocalInstaller Installer { get; }
     public MetricsCollector Metrics { get; }
     public PinKeeper Pins { get; }
+    public ArchiveWarmer Archives { get; }
     public LocalMobileBridgeService MobileBridge { get; }
     public SmartStorageOffloaderService Offloader { get; }
     public IReadOnlyList<DependencyStatus> Dependencies { get; private set; } = [];
     public IReadOnlyList<RemoteEntry> Remotes { get; private set; } = [];
+    /// <summary>Google Drive accounts still signed in through rclone's shared OAuth client, which rclone retires during 2026.</summary>
+    public IReadOnlyList<string> SharedClientRemotes { get; private set; } = [];
+    /// <summary>Combined drives (rclone unions): union remote name → the account remotes it joins.</summary>
+    public IReadOnlyDictionary<string, IReadOnlyList<string>> Unions { get; private set; } = new Dictionary<string, IReadOnlyList<string>>();
+    /// <summary>Live identity (Gmail address, name) and storage of each connected account; filled by <see cref="RefreshAccountsAsync"/>.</summary>
+    public IReadOnlyDictionary<string, CloudAccountInfo> Accounts { get; private set; } = new Dictionary<string, CloudAccountInfo>();
+    public DateTime AccountsRefreshedAt { get; private set; }
+    private readonly SemaphoreSlim _accountsGate = new(1, 1);
     public LaunchSession? CurrentLaunch { get; private set; }
     public bool DiskPressure => _diskPressure;
     public string CpxPath => Path.Combine(AppPaths.AppDirectory, "cpx.exe");
@@ -155,6 +169,7 @@ public sealed class AppHost : IAsyncDisposable
         if (Settings.MobileBridge.Enabled) MobileBridge.Start();
         Metrics.Start();
         StateChanged?.Invoke();
+        _ = RefreshAccountsAsync(CancellationToken.None);
     }
 
     public void RefreshDependencies()
@@ -169,9 +184,175 @@ public sealed class AppHost : IAsyncDisposable
         {
             Remotes = await RcloneConfig.ListRemotesAsync(Rclone, ct);
             foreach (var r in Remotes) _remoteTypes[r.Name] = r.Type;
+            var dump = await RcloneConfig.DumpAsync(Rclone, ct);
+            SharedClientRemotes = RcloneConfigService.SharedClientDriveRemotes(dump);
+            Unions = RcloneConfigService.Unions(dump).Concat(RcloneConfigService.Combines(dump))
+                .ToDictionary(u => u.Name, u => RcloneConfigService.UpstreamRemotes(u.Upstreams));
+            // Forget accounts that were disconnected; newly connected ones appear after RefreshAccountsAsync.
+            Accounts = Accounts.Where(a => Remotes.Any(r => r.Name == a.Key)).ToDictionary(a => a.Key, a => a.Value);
         }
         catch (Exception e) { _log.LogWarning("Listing rclone remotes failed: {Error}", e.Message); }
     }
+
+    /// <summary>
+    /// Asks every connected account who it is (Gmail address) and how much storage it has. Takes a few seconds, so
+    /// callers that only want fresh numbers start it without awaiting; <see cref="StateChanged"/> fires when it is done.
+    /// </summary>
+    public async Task RefreshAccountsAsync(CancellationToken ct = default, TimeSpan? maxAge = null)
+    {
+        if (Rclone is null) return;
+        await _accountsGate.WaitAsync(ct);
+        try
+        {
+            var remotes = Remotes;
+            // A refresh that just finished (e.g. the one started at startup) is good enough for a caller that allows it.
+            if (maxAge is { } age && DateTime.UtcNow - AccountsRefreshedAt < age && remotes.All(r => Accounts.ContainsKey(r.Name))) return;
+            var infos = await Drive.AccountInfoAsync(Rclone, remotes, ct);
+            Accounts = infos.ToDictionary(i => i.Remote);
+            AccountsRefreshedAt = DateTime.UtcNow;
+            // Remember the addresses, so drives and folders keep their names when the PC starts offline.
+            var known = infos.Where(i => i.Email != null).ToDictionary(i => i.Remote, i => i.Email!);
+            if (known.Any(k => Settings.AccountEmails.GetValueOrDefault(k.Key) != k.Value))
+            {
+                foreach (var (remote, email) in known) Settings.AccountEmails[remote] = email;
+                SaveSettings();
+            }
+        }
+        catch (Exception e) when (e is not OperationCanceledException) { _log.LogWarning("Reading account details failed: {Error}", e.Message); }
+        finally { _accountsGate.Release(); }
+        StateChanged?.Invoke();
+    }
+
+    /// <summary>The account remotes behind a remote: itself, or for a combined drive every account it joins.</summary>
+    public IReadOnlyList<string> AccountsBehind(string remote) => Unions.TryGetValue(remote, out var ups) ? ups : [remote];
+
+    /// <summary>The sign-in address of an account (live, else last known), or its internal name when never seen.</summary>
+    public string AccountName(string remote) =>
+        Accounts.GetValueOrDefault(remote)?.Email ?? Settings.AccountEmails.GetValueOrDefault(remote) ?? remote;
+
+    /// <summary>What to call a remote on screen: its Gmail address when known, for a combined drive all of them.</summary>
+    public string AccountLabel(string remote) => string.Join(" + ", AccountsBehind(remote).Select(AccountName));
+
+    /// <summary>True for the union/combine remotes Cloud-SSD generates behind its two standard drives (not real accounts).</summary>
+    public static bool IsGeneratedType(string type) => type is "union" or "combine";
+
+    public const string CombinedRemote = "CloudSSD", SingleRemote = "Accounts";
+    public const string CombinedMountId = "cloudssd", SingleMountId = "accounts";
+
+    /// <summary>
+    /// Keeps exactly two cloud drives, whatever accounts are connected:
+    /// "Each Account" — one folder per account, so every account can be seen on its own; and
+    /// "All Accounts" — every account joined into one drive whose size is the sum of the connected accounts.
+    /// Any other cloud drive (one letter per account, the same account mounted twice) is disconnected and removed,
+    /// and the same Gmail signed in twice is kept once. Only local logins and drive entries change — never cloud files.
+    /// </summary>
+    public async Task SyncStandardDrivesAsync(CancellationToken ct = default)
+    {
+        if (Rclone is not { } rclone) return;
+        if (CurrentLaunch is { State: LaunchState.Running } l)
+            throw new InvalidOperationException($"{l.Game.Name} is running from a cloud drive. Close it, then try again.");
+
+        await RefreshRemotesAsync(ct);
+        // Entries without a type are leftovers of removed accounts; they must not show up as accounts.
+        foreach (var broken in Remotes.Where(r => string.IsNullOrWhiteSpace(r.Type)).ToList())
+            await RcloneConfig.DeleteRemoteAsync(rclone, broken.Name, ct);
+        await RefreshRemotesAsync(ct);
+        await RefreshAccountsAsync(ct, TimeSpan.FromSeconds(30));
+        var dump = await RcloneConfig.DumpAsync(rclone, ct);
+        var readOnly = RcloneConfigService.ReadOnlyDriveRemotes(dump);
+
+        // Every real login once; of two sign-ins of the same Gmail the writable one stays.
+        var logins = Remotes.Where(r => !IsGeneratedType(r.Type)).ToList();
+        var accounts = logins.GroupBy(r => AccountName(r.Name), StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.OrderBy(r => readOnly.Contains(r.Name)).First()).ToList();
+        foreach (var twin in logins.Except(accounts))
+        {
+            _log.LogInformation("Removing second sign-in {Remote} of an account that is already connected", twin.Name);
+            await RcloneConfig.DeleteRemoteAsync(rclone, twin.Name, ct);
+        }
+
+        // Drives other than the two standard ones go away. (":http…" style on-the-fly remotes are not accounts.)
+        foreach (var m in Settings.Mounts.Where(m => m.Id is not (CombinedMountId or SingleMountId) && !m.RemoteName.StartsWith(':')).ToList())
+        {
+            if (Mounts.Get(m.Id) != null) await UnmountAsync(m.Id);
+            Settings.Mounts.Remove(m);
+        }
+        foreach (var old in Remotes.Where(r => IsGeneratedType(r.Type) && r.Name is not (CombinedRemote or SingleRemote)).ToList())
+            await RcloneConfig.DeleteRemoteAsync(rclone, old.Name, ct);
+
+        if (accounts.Count == 0)
+        {
+            foreach (var m in Settings.Mounts.Where(m => m.Id is CombinedMountId or SingleMountId).ToList())
+            {
+                if (Mounts.Get(m.Id) != null) await UnmountAsync(m.Id);
+                Settings.Mounts.Remove(m);
+            }
+            foreach (var name in new[] { CombinedRemote, SingleRemote }.Where(n => Remotes.Any(r => r.Name == n)))
+                await RcloneConfig.DeleteRemoteAsync(rclone, name, ct);
+            SaveSettings();
+            await RefreshRemotesAsync(ct);
+            StateChanged?.Invoke();
+            return;
+        }
+
+        // Read-only sign-ins are shown in the joined drive but never chosen for new files (":ro").
+        var unionUpstreams = string.Join(' ', accounts.Select(r => r.Name + (readOnly.Contains(r.Name) ? "::ro" : ":")));
+        var combineUpstreams = string.Join(' ', accounts.Select(r => $"{FolderName(AccountName(r.Name))}={r.Name}:"));
+        var unionChanged = RcloneConfigService.Unions(dump).FirstOrDefault(u => u.Name == CombinedRemote).Upstreams != unionUpstreams;
+        var combineChanged = RcloneConfigService.Combines(dump).FirstOrDefault(u => u.Name == SingleRemote).Upstreams != combineUpstreams;
+        if (unionChanged)
+            await RcloneConfig.WriteRemoteAsync(rclone, CombinedRemote, "union",
+                [("upstreams", unionUpstreams), ("action_policy", "epmfs"), ("create_policy", "mfs"), ("search_policy", "ff")], ct);
+        if (combineChanged)
+            await RcloneConfig.WriteRemoteAsync(rclone, SingleRemote, "combine", [("upstreams", combineUpstreams)], ct);
+        await RefreshRemotesAsync(ct);
+
+        var all = StandardDrive(CombinedMountId, "All Accounts", CombinedRemote, 'Z');
+        all.ReadOnly = accounts.All(r => readOnly.Contains(r.Name));
+        var each = StandardDrive(SingleMountId, "Each Account", SingleRemote, 'Y');
+        if (Settings.Mounts.All(m => m.Id != Settings.SmartOffload.TargetMountId)) Settings.SmartOffload.TargetMountId = CombinedMountId;
+        SaveSettings();
+
+        foreach (var (def, changed) in new[] { (each, combineChanged), (all, unionChanged) })
+        {
+            try
+            {
+                // A running mount keeps the account list it started with, so it reconnects when that list changed.
+                if (changed && Mounts.Get(def.Id) != null) await UnmountAsync(def.Id);
+                if (Mounts.Get(def.Id) == null)
+                {
+                    var s = await MountAsync(def, ct);
+                    def.DriveLetter = s.DriveLetter.ToString();
+                }
+            }
+            catch (Exception e) when (e is not OperationCanceledException)
+            {
+                _log.LogError("Could not connect drive {Name}: {Error}", def.DisplayName, e.Message);
+            }
+        }
+        SaveSettings();
+        StateChanged?.Invoke();
+        _ = RefreshAccountsAsync(CancellationToken.None); // sizes of the two drives themselves
+    }
+
+    private MountDefinition StandardDrive(string id, string displayName, string remote, char preferredLetter)
+    {
+        var def = Settings.Mounts.FirstOrDefault(m => m.Id == id);
+        if (def is null)
+        {
+            var free = !DriveInfo.GetDrives().Any(d => char.ToUpperInvariant(d.Name[0]) == preferredLetter);
+            def = new MountDefinition { Id = id, AutoMount = true, DriveLetter = free ? preferredLetter.ToString() : null };
+            Settings.Mounts.Add(def);
+        }
+        def.DisplayName = displayName;
+        def.RemoteName = remote;
+        def.RemotePath = "";
+        return def;
+    }
+
+    /// <summary>An account name usable as a folder name inside the "Each Account" drive (no spaces or path characters).</summary>
+    private static string FolderName(string account) =>
+        new(account.Select(c => char.IsWhiteSpace(c) || c is '=' or ':' or '/' or '\\' or '"' or '*' or '?' or '<' or '>' or '|' ? '_' : c).ToArray());
 
     public void SaveSettings() => SettingsStore.Save(Settings);
 
@@ -421,6 +602,7 @@ public sealed class AppHost : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         _diskTimer?.Dispose();
+        Archives.Dispose();
         Pins.Dispose();
         Metrics.Dispose();
         foreach (var id in _gameAware.Keys.ToList()) StopGameAware(id);

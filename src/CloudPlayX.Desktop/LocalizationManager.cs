@@ -320,6 +320,20 @@ public static class LocalizationManager
             ["Application reads"] = "Application Reads / Sec",
             ["Totals since start"] = "Ab tak ka Total Data",
 
+            // PC Memory View
+            ["RAM IN USE"] = "RAM USE HO RAHI HAI",
+            ["RAM FREE"] = "RAM KHALI",
+            ["RESERVED BY APPS (COMMIT)"] = "APPS NE RESERVE KI (COMMIT)",
+            ["Page file"] = "Page File (Virtual Memory)",
+            ["RAM use (last 5 min)"] = "RAM ka Use (pichhle 5 min)",
+            ["Near the top, Windows starts using the page file on the SSD and games stutter."] = "Upar ke paas pahunchne par Windows SSD ki page file use karta hai aur game atakta hai.",
+            ["Open Windows page-file settings"] = "Windows ki Page-File Settings Kholein",
+            ["Best setting: 'Automatically manage paging file size for all drives'. A page file stops crashes when RAM is full; it does not make the PC faster."] = "Sabse sahi setting: 'Automatically manage paging file size for all drives'. Page file RAM full hone par crash rokti hai; PC tez nahi karti.",
+            ["Apps using the most RAM"] = "Sabse zyada RAM lene wale Apps",
+            ["Close"] = "Band Karein",
+            ["RAM held by all of an app's processes together (approximate). Close asks the app to close the normal way, like pressing X; Windows and Cloud-SSD processes have no Close button."] = "Ek app ke saare processes ki RAM milakar (andaza). Band Karein dabane par app normal tareeke se band hota hai, jaise X dabana; Windows aur Cloud-SSD ke process par yeh button nahi hota.",
+            ["This page only reads what Windows reports. It never changes a Windows setting and closes an app only when you press Close."] = "Yeh page sirf wahi dikhata hai jo Windows batata hai. Koi Windows setting nahi badalta, aur app tabhi band karta hai jab aap Band Karein dabayein.",
+
             // Settings View
             ["Network"] = "Internet / Network Settings",
             ["Prediction engine"] = "Smart Prediction Engine",
@@ -423,6 +437,20 @@ public static class LocalizationManager
             ["Average read wait"] = "औसत प्रतीक्षा समय",
             ["Application reads"] = "एप्लिकेशन रीड्स / सेकंड",
             ["Totals since start"] = "प्रारंभ से कुल डेटा",
+
+            // PC Memory View
+            ["RAM IN USE"] = "उपयोग में रैम",
+            ["RAM FREE"] = "खाली रैम",
+            ["RESERVED BY APPS (COMMIT)"] = "ऐप्स द्वारा आरक्षित (कमिट)",
+            ["Page file"] = "पेज फ़ाइल (वर्चुअल मेमोरी)",
+            ["RAM use (last 5 min)"] = "रैम उपयोग (पिछले 5 मिनट)",
+            ["Near the top, Windows starts using the page file on the SSD and games stutter."] = "ऊपर के पास पहुँचने पर विंडोज़ एसएसडी की पेज फ़ाइल इस्तेमाल करता है और गेम अटकता है।",
+            ["Open Windows page-file settings"] = "विंडोज़ की पेज-फ़ाइल सेटिंग्स खोलें",
+            ["Best setting: 'Automatically manage paging file size for all drives'. A page file stops crashes when RAM is full; it does not make the PC faster."] = "सबसे सही सेटिंग: 'Automatically manage paging file size for all drives'। पेज फ़ाइल रैम भरने पर क्रैश रोकती है; पीसी तेज़ नहीं करती।",
+            ["Apps using the most RAM"] = "सबसे ज़्यादा रैम लेने वाले ऐप्स",
+            ["Close"] = "बंद करें",
+            ["RAM held by all of an app's processes together (approximate). Close asks the app to close the normal way, like pressing X; Windows and Cloud-SSD processes have no Close button."] = "एक ऐप के सभी प्रोसेस की रैम मिलाकर (अनुमानित)। बंद करें दबाने पर ऐप सामान्य तरीके से बंद होता है, जैसे X दबाना; विंडोज़ और Cloud-SSD के प्रोसेस पर यह बटन नहीं होता।",
+            ["This page only reads what Windows reports. It never changes a Windows setting and closes an app only when you press Close."] = "यह पेज केवल वही दिखाता है जो विंडोज़ बताता है। कोई विंडोज़ सेटिंग नहीं बदलता, और ऐप तभी बंद करता है जब आप बंद करें दबाएँ।",
 
             // Settings View
             ["Network"] = "नेटवर्क सेटिंग्स",

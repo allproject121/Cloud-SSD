@@ -9,6 +9,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using CloudPlayX.Core;
+using CloudPlayX.Mount;
 using Microsoft.Extensions.Logging;
 
 namespace CloudPlayX.App;
@@ -28,7 +29,8 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
 
     private readonly AppHost _host;
     private readonly ILogger<LocalMobileBridgeService> _log;
-    private readonly ConcurrentBag<TcpClient> _activeClients = new();
+    // At most this many connections at once; more are closed straight away instead of piling up.
+    private readonly SemaphoreSlim _connections = new(64);
     private CancellationTokenSource? _cts;
     private TcpListener? _listener;
     private Task? _acceptTask;
@@ -50,6 +52,19 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
     public bool IsRunning => _listener != null && (_cts != null && !_cts.IsCancellationRequested);
     public int Port => _host.Settings.MobileBridge.Port;
     public string PairingToken => _host.Settings.MobileBridge.PairingToken;
+
+    /// <summary>
+    /// Six digits shown in Mobile Hub. A phone on the local network types them once and gets the long token back, so
+    /// nobody has to type 32 characters. Used once, then replaced; wrong guesses lock code pairing for a minute.
+    /// </summary>
+    public string PairingCode { get; private set; } = NewPairingCode();
+    private readonly object _codeLock = new();
+    private int _codeFailures;
+    private DateTimeOffset _codeLockedUntil;
+    internal const int MaxCodeFailures = 5;
+    internal static readonly TimeSpan CodeLockout = TimeSpan.FromSeconds(60);
+
+    internal static string NewPairingCode() => RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6", CultureInfo.InvariantCulture);
     public double CurrentTransferRateMbps => _currentRateMbps;
     public long TotalBytesTransferred => Interlocked.Read(ref _bytesTransferred);
 
@@ -136,6 +151,14 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
     {
         if (IsRunning) return;
 
+        if (PairingToken.Length < MobileBridgeSettings.MinPairingTokenLength)
+        {
+            // v0.7.0 tokens had only 48 bits; replace them. Paired phones scan the new QR code once.
+            _host.Settings.MobileBridge.PairingToken = MobileBridgeSettings.NewPairingToken();
+            _host.SaveSettings();
+            _log.LogWarning("Mobile Bridge pairing token upgraded to 128 bits; phones need to scan the QR code again");
+        }
+
         try
         {
             _cts = new CancellationTokenSource();
@@ -182,6 +205,7 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
         {
             try { await _acceptTask; } catch { }
         }
+        _telemetry.Dispose();
     }
 
     private async Task AcceptLoopAsync()
@@ -192,9 +216,17 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
             try
             {
                 var client = await _listener.AcceptTcpClientAsync(ct);
+                if (!_connections.Wait(0))
+                {
+                    client.Dispose();
+                    continue;
+                }
                 client.NoDelay = true;
-                _activeClients.Add(client);
-                _ = Task.Run(() => HandleClientAsync(client, ct), ct);
+                _ = Task.Run(async () =>
+                {
+                    try { await HandleClientAsync(client, ct); }
+                    finally { _connections.Release(); }
+                }, CancellationToken.None);
             }
             catch (OperationCanceledException) { break; }
             catch (ObjectDisposedException) { break; }
@@ -217,7 +249,10 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
                 // Read request headers byte-by-byte into buffer until \r\n\r\n (avoids StreamReader buffering body bytes)
                 var headerBytes = new List<byte>(512);
                 byte[] oneByte = new byte[1];
-                while (await networkStream.ReadAsync(oneByte.AsMemory(0, 1), ct) > 0)
+                // A client that never finishes its headers must not hold the connection forever.
+                using var headerTimeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                headerTimeout.CancelAfter(TimeSpan.FromSeconds(15));
+                while (await networkStream.ReadAsync(oneByte.AsMemory(0, 1), headerTimeout.Token) > 0)
                 {
                     headerBytes.Add(oneByte[0]);
                     int count = headerBytes.Count;
@@ -259,6 +294,13 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
 
                 var clientEndpoint = client.Client.RemoteEndPoint as IPEndPoint;
                 var clientIp = clientEndpoint?.Address.ToString() ?? "unknown";
+
+                // DNS rebinding guard: a web page can only reach us through a host name it controls, never an IP literal.
+                if (!IsAllowedHost(headers.GetValueOrDefault("Host")))
+                {
+                    await SendResponseAsync(networkStream, 421, "Misdirected Request", "text/plain", Encoding.UTF8.GetBytes("Unknown host"), ct);
+                    return;
+                }
 
                 // Handle CORS preflight
                 if (method == "OPTIONS")
@@ -311,7 +353,9 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
             ?? (headers.GetValueOrDefault("Authorization")?.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase) == true
                 ? headers["Authorization"][7..].Trim() : null);
 
-        bool isPaired = IsClientPaired(clientIp, token);
+        // Every request carries the token: being on the same Wi-Fi, on a previously paired IP or on this PC is not enough.
+        // (128 random bits, so guessing needs no rate limit — and a limit would lock out phones polling with an old token.)
+        bool isPaired = TokenMatches(token) && !IsBlocked(clientIp);
 
         if (path.Equals("/api/pair", StringComparison.OrdinalIgnoreCase) && method == "POST")
         {
@@ -325,26 +369,37 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
             return;
         }
 
-        if (path.Equals("/api/hud", StringComparison.OrdinalIgnoreCase))
+        if (!isPaired)
         {
-            await HandleHudEndpointAsync(stream, ct);
-            return;
-        }
-
-        // Other API endpoints require valid pairing or loopback access
-        if (!isPaired && !IPAddress.IsLoopback(IPAddress.TryParse(clientIp, out var ip) ? ip : IPAddress.Any))
-        {
-            var unauthJson = JsonSerializer.Serialize(new { error = "Unauthorized. Please scan the QR code to pair your device." }, JsonOpts);
-            await SendResponseAsync(stream, 401, "Unauthorized", "application/json; charset=utf-8", Encoding.UTF8.GetBytes(unauthJson), ct);
+            await SendJsonAsync(stream, 401, "Unauthorized", new { error = "Unauthorized. Please scan the QR code to pair your device." }, ct);
             return;
         }
 
         // Update LastSeen for paired device
         UpdateDeviceLastSeen(clientIp);
 
-        if (path.Equals("/api/drives", StringComparison.OrdinalIgnoreCase))
+        var bridge = _host.Settings.MobileBridge;
+        if (Feature(path) is { } feature && !feature.allowed(bridge))
+        {
+            await SendJsonAsync(stream, 403, "Forbidden", new { error = $"{feature.name} is switched off in Cloud-SSD → Mobile Hub settings." }, ct);
+            return;
+        }
+
+        if (path.Equals("/api/hud", StringComparison.OrdinalIgnoreCase))
+        {
+            await HandleHudEndpointAsync(stream, ct);
+        }
+        else if (path.Equals("/api/drives", StringComparison.OrdinalIgnoreCase))
         {
             await HandleDrivesEndpointAsync(stream, ct);
+        }
+        else if (path.Equals("/api/drives/mount", StringComparison.OrdinalIgnoreCase))
+        {
+            await HandleDriveMountEndpointAsync(method, queryParams, stream, ct);
+        }
+        else if (path.Equals("/api/drives/unmount", StringComparison.OrdinalIgnoreCase))
+        {
+            await HandleDriveUnmountEndpointAsync(method, queryParams, stream, ct);
         }
         else if (path.Equals("/api/files", StringComparison.OrdinalIgnoreCase))
         {
@@ -405,6 +460,10 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
         {
             await HandleOffloadNowEndpointAsync(stream, ct);
         }
+        else if (path.Equals("/api/remote", StringComparison.OrdinalIgnoreCase))
+        {
+            await HandleRemoteEndpointAsync(method, queryParams, stream, ct);
+        }
         else
         {
             var notFoundJson = JsonSerializer.Serialize(new { error = "API endpoint not found" }, JsonOpts);
@@ -412,27 +471,54 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
         }
     }
 
-    private bool IsClientPaired(string clientIp, string? token)
+    private bool TokenMatches(string? token) =>
+        !string.IsNullOrEmpty(token) &&
+        CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(token), Encoding.UTF8.GetBytes(PairingToken));
+
+    private bool IsBlocked(string clientIp)
     {
-        if (!string.IsNullOrEmpty(token) && string.Equals(token, PairingToken, StringComparison.Ordinal))
-        {
-            return true;
-        }
-
-        var device = _host.Settings.MobileBridge.PairedDevices
-            .FirstOrDefault(d => d.IpAddress == clientIp && !d.IsBlocked);
-
-        return device != null;
+        lock (_devicesLock) return _host.Settings.MobileBridge.PairedDevices.Any(d => d.IpAddress == clientIp && d.IsBlocked);
     }
 
     private void UpdateDeviceLastSeen(string clientIp)
     {
-        var device = _host.Settings.MobileBridge.PairedDevices.FirstOrDefault(d => d.IpAddress == clientIp);
-        if (device != null)
+        lock (_devicesLock)
         {
-            device.LastSeen = DateTimeOffset.Now;
+            var device = _host.Settings.MobileBridge.PairedDevices.FirstOrDefault(d => d.IpAddress == clientIp);
+            if (device != null) device.LastSeen = DateTimeOffset.Now;
         }
     }
+
+    private readonly object _devicesLock = new();
+
+    /// <summary>
+    /// The Host header must name this PC by IP literal, "localhost" or its machine name. A malicious web page can only
+    /// point a DNS name it owns at us (DNS rebinding), so anything else is refused.
+    /// </summary>
+    internal static bool IsAllowedHost(string? hostHeader)
+    {
+        if (string.IsNullOrWhiteSpace(hostHeader)) return true; // HTTP/1.0 clients; browsers always send Host
+        var host = hostHeader.Trim();
+        if (host.StartsWith('['))
+            host = host[1..Math.Max(1, host.IndexOf(']'))];               // [::1]:8090
+        else if (host.Count(c => c == ':') == 1)
+            host = host[..host.IndexOf(':')];                            // 192.168.1.5:8090
+        return IPAddress.TryParse(host, out _)
+               || host.Equals("localhost", StringComparison.OrdinalIgnoreCase)
+               || host.Equals(Environment.MachineName, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static (string name, Func<MobileBridgeSettings, bool> allowed)? Feature(string path) => path.ToLowerInvariant() switch
+    {
+        "/api/files" or "/api/preview" or "/api/drives" => ("Drive browsing", s => s.AllowDriveBrowsing),
+        "/api/stream" or "/api/download" or "/api/open-pc" => ("Streaming", s => s.AllowStreaming),
+        "/api/upload" => ("Uploads", s => s.AllowUploads),
+        "/api/hud" or "/api/remote" => ("Gaming HUD and PC remote", s => s.AllowGamingHud),
+        _ => null
+    };
+
+    private static Task SendJsonAsync(NetworkStream stream, int status, string statusText, object body, CancellationToken ct) =>
+        SendResponseAsync(stream, status, statusText, "application/json; charset=utf-8", JsonSerializer.SerializeToUtf8Bytes(body, JsonOpts), ct);
 
     private async Task HandlePairEndpointAsync(
         Dictionary<string, string> queryParams,
@@ -442,6 +528,7 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
         CancellationToken ct)
     {
         string? reqToken = queryParams.GetValueOrDefault("token");
+        string? reqCode = queryParams.GetValueOrDefault("code");
         string deviceName = queryParams.GetValueOrDefault("name", "Android Device");
 
         if (headers.TryGetValue("Content-Length", out var clStr) && int.TryParse(clStr, out int cl) && cl > 0 && cl < 10000)
@@ -459,30 +546,46 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
             {
                 using var doc = JsonDocument.Parse(body);
                 if (doc.RootElement.TryGetProperty("token", out var tProp)) reqToken = tProp.GetString();
+                if (doc.RootElement.TryGetProperty("code", out var cProp)) reqCode = cProp.GetString();
                 if (doc.RootElement.TryGetProperty("name", out var nProp)) deviceName = nProp.GetString() ?? deviceName;
             }
             catch { }
         }
+        if (deviceName.Length > 60) deviceName = deviceName[..60];
 
-        if (string.Equals(reqToken, PairingToken, StringComparison.Ordinal))
+        bool byCode = false;
+        if (!TokenMatches(reqToken) && !string.IsNullOrWhiteSpace(reqCode))
         {
-            var existing = _host.Settings.MobileBridge.PairedDevices.FirstOrDefault(d => d.IpAddress == clientIp);
-            if (existing != null)
+            var (ok, retryAfter) = TryPairingCode(reqCode, clientIp);
+            if (retryAfter > 0)
             {
-                existing.LastSeen = DateTimeOffset.Now;
-                existing.Name = deviceName;
-                existing.IsBlocked = false;
+                await SendJsonAsync(stream, 429, "Too Many Requests", new { success = false, error = $"Too many wrong codes. Try again in {retryAfter} seconds with the new code shown on the PC.", retryAfterSeconds = retryAfter }, ct);
+                return;
             }
-            else
+            byCode = ok;
+        }
+
+        if ((byCode || TokenMatches(reqToken)) && !IsBlocked(clientIp))
+        {
+            lock (_devicesLock)
             {
-                _host.Settings.MobileBridge.PairedDevices.Add(new PairedDevice
+                var existing = _host.Settings.MobileBridge.PairedDevices.FirstOrDefault(d => d.IpAddress == clientIp);
+                if (existing != null)
                 {
-                    Name = deviceName,
-                    IpAddress = clientIp,
-                    PairedAt = DateTimeOffset.Now,
-                    LastSeen = DateTimeOffset.Now,
-                    IsBlocked = false
-                });
+                    existing.LastSeen = DateTimeOffset.Now;
+                    existing.Name = deviceName;
+                }
+                else
+                {
+                    _host.Settings.MobileBridge.PairedDevices.Add(new PairedDevice
+                    {
+                        Name = deviceName,
+                        IpAddress = clientIp,
+                        PairedAt = DateTimeOffset.Now,
+                        LastSeen = DateTimeOffset.Now,
+                        IsBlocked = false
+                    });
+                }
             }
 
             _host.SaveSettings();
@@ -501,13 +604,64 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
         }
         else
         {
-            var resp = JsonSerializer.Serialize(new { success = false, error = "Invalid pairing token." }, JsonOpts);
+            var resp = JsonSerializer.Serialize(new { success = false, error = string.IsNullOrWhiteSpace(reqCode) ? "Invalid pairing token." : "Wrong pairing code. Check the 6 digits shown in Cloud-SSD → Phone on the PC." }, JsonOpts);
             await SendResponseAsync(stream, 403, "Forbidden", "application/json; charset=utf-8", Encoding.UTF8.GetBytes(resp), ct);
         }
     }
 
+    /// <summary>
+    /// Checks a typed 6-digit code. Only devices on the local network may try, a right code is used up, and
+    /// <see cref="MaxCodeFailures"/> wrong ones replace the code and pause code pairing (RetryAfterSeconds &gt; 0).
+    /// </summary>
+    internal (bool Ok, int RetryAfterSeconds) TryPairingCode(string code, string clientIp)
+    {
+        if (!IsLocalNetworkAddress(clientIp)) return (false, 0);
+        bool ok;
+        lock (_codeLock)
+        {
+            var wait = _codeLockedUntil - DateTimeOffset.UtcNow;
+            if (wait > TimeSpan.Zero) return (false, (int)Math.Ceiling(wait.TotalSeconds));
+
+            var digits = new string(code.Where(char.IsAsciiDigit).ToArray());
+            ok = digits.Length == PairingCode.Length &&
+                 CryptographicOperations.FixedTimeEquals(Encoding.ASCII.GetBytes(digits), Encoding.ASCII.GetBytes(PairingCode));
+            if (ok)
+            {
+                _codeFailures = 0;
+                PairingCode = NewPairingCode();
+            }
+            else if (++_codeFailures >= MaxCodeFailures)
+            {
+                _codeFailures = 0;
+                PairingCode = NewPairingCode();
+                _codeLockedUntil = DateTimeOffset.UtcNow + CodeLockout;
+                _log.LogWarning("Mobile Bridge: {Count} wrong pairing codes from {Ip}; code replaced, code pairing paused for {Seconds} s", MaxCodeFailures, clientIp, CodeLockout.TotalSeconds);
+            }
+        }
+        StatusChanged?.Invoke(); // Mobile Hub shows the new code
+        return (ok, 0);
+    }
+
+    /// <summary>Loopback, private (10/8, 172.16/12, 192.168/16), link-local and IPv6 unique-local addresses.</summary>
+    internal static bool IsLocalNetworkAddress(string? ip)
+    {
+        if (!IPAddress.TryParse(ip, out var addr)) return false;
+        if (addr.IsIPv4MappedToIPv6) addr = addr.MapToIPv4();
+        if (IPAddress.IsLoopback(addr)) return true;
+        if (addr.AddressFamily == AddressFamily.InterNetworkV6) return addr.IsIPv6LinkLocal || addr.IsIPv6UniqueLocal;
+        var b = addr.GetAddressBytes();
+        return b[0] == 10 || (b[0] == 172 && b[1] is >= 16 and <= 31) || (b[0] == 192 && b[1] == 168) || (b[0] == 169 && b[1] == 254);
+    }
+
     private async Task HandleStatusEndpointAsync(NetworkStream stream, bool isPaired, CancellationToken ct)
     {
+        if (!isPaired)
+        {
+            // Enough for the phone to find the PC and ask for pairing; nothing about drives, games or storage.
+            await SendJsonAsync(stream, 200, "OK", new { pcName = Environment.MachineName, version = "0.7.0", port = Port, isPaired = false }, ct);
+            return;
+        }
+
         var metrics = _host.Metrics.Latest;
         double downMbps = metrics.DownloadBytesPerSec is { } bps ? Bandwidth.BytesPerSecondToMbps(bps) : 0;
         string? activeGame = _host.CurrentLaunch?.Game.Name;
@@ -541,10 +695,25 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
                 totalTransferredBytes = TotalBytesTransferred,
                 activePrefetches = _host.Engine.Scheduler.Active,
                 queuedPrefetches = _host.Engine.Queue.Count,
-                cacheHitRate = 98.4,
-                fps = activeGame != null ? 75 : 0
+                cacheHitRate = CacheHitRate(metrics),
+                fps = (int?)null // no frame-rate source yet (would need PresentMon/ETW)
             },
-            drivesCount = _host.Mounts.Sessions.Count,
+            // No disk calls here: the phone polls this every few seconds.
+            drives = _host.Settings.Mounts.Select(m =>
+            {
+                var s = _host.Mounts.Get(m.Id);
+                return new
+                {
+                    id = m.Id,
+                    displayName = m.DisplayName,
+                    driveLetter = (s?.DriveLetter.ToString() ?? m.DriveLetter ?? "?") + ":",
+                    isMounted = s is { State: MountState.Mounted }
+                };
+            }).ToList(),
+            drivesCount = _host.Mounts.Sessions.Count(s => s.State == MountState.Mounted),
+            drivesTotal = _host.Settings.Mounts.Count,
+            cloud = CloudStorageSummary(),
+            uploadDirectory = UploadDirectory,
             devicesCount = _host.Settings.MobileBridge.PairedDevices.Count(d => !d.IsBlocked)
         };
 
@@ -558,242 +727,487 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
         var activeGame = _host.CurrentLaunch?.Game.Name;
         double ssdSpeedMbps = metrics.DownloadBytesPerSec is { } bps ? Bandwidth.BytesPerSecondToMBps(bps) : 0;
 
+        var sys = _telemetry.Sample();
+        // Values the PC cannot measure are null (the phone shows "—"), never made up.
         var hud = new
         {
             activeGame = activeGame ?? "No Active Game",
             isGaming = activeGame != null,
-            fps = activeGame != null ? 75 : 0,
+            fps = (int?)null,
             ssdReadMBps = Math.Round(ssdSpeedMbps, 1),
-            cacheHitRate = 98.4,
+            cacheHitRate = CacheHitRate(metrics),
             activePrefetches = _host.Engine.Scheduler.Active,
             queuedBlocks = _host.Engine.Queue.Count,
-            cpuTempC = 58,
-            gpuTempC = 64,
-            gpuLoad = 85
+            cpuLoad = sys.CpuLoadPercent,
+            ramUsedPercent = sys.RamUsedPercent,
+            gpuLoad = sys.GpuLoadPercent,
+            cpuTempC = sys.CpuTempC,
+            gpuTempC = (double?)null
         };
 
         var json = JsonSerializer.Serialize(hud, JsonOpts);
         await SendResponseAsync(stream, 200, "OK", "application/json; charset=utf-8", Encoding.UTF8.GetBytes(json), ct);
     }
 
+    private readonly SystemTelemetry _telemetry = new();
+
+    private string UploadDirectory => _host.Settings.MobileBridge.UploadDirectory
+        ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "Cloud-SSD_Uploads");
+
+    /// <summary>Real sign-ins only (the generated union/combine remotes are views of these, not extra storage).</summary>
+    private IEnumerable<CloudAccountInfo> RealAccounts() =>
+        _host.Remotes.Where(r => !AppHost.IsGeneratedType(r.Type) && !string.IsNullOrWhiteSpace(r.Type))
+            .Select(r => _host.Accounts.GetValueOrDefault(r.Name) ?? new CloudAccountInfo(r.Name, _host.Settings.AccountEmails.GetValueOrDefault(r.Name), null, null, null, null, false));
+
+    private object AccountDto(CloudAccountInfo a) => new
+    {
+        name = a.Email ?? _host.AccountName(a.Remote),
+        displayName = a.DisplayName,
+        usedBytes = a.UsedBytes,
+        totalBytes = a.TotalBytes,
+        freeBytes = a.FreeBytes ?? (a.TotalBytes is { } t && a.UsedBytes is { } u ? Math.Max(0, t - u) : null),
+        reachable = a.Reachable
+    };
+
+    /// <summary>
+    /// Used/total space over all connected accounts, as last reported by the providers. Asking the providers takes a
+    /// few seconds, so numbers older than <paramref name="maxAge"/> are refreshed in the background and the next call
+    /// gets them. Null numbers mean "not known yet", never a made-up size.
+    /// </summary>
+    private object CloudStorageSummary(TimeSpan? maxAge = null)
+    {
+        var age = maxAge ?? TimeSpan.FromMinutes(5);
+        if (_host.Rclone != null && DateTime.UtcNow - _host.AccountsRefreshedAt > age && Interlocked.CompareExchange(ref _accountsRefreshing, 1, 0) == 0)
+        {
+            _ = Task.Run(async () =>
+            {
+                try { await _host.RefreshAccountsAsync(CancellationToken.None, age); }
+                catch (Exception e) { _log.LogDebug(e, "Background account refresh failed"); }
+                finally { Interlocked.Exchange(ref _accountsRefreshing, 0); }
+            });
+        }
+
+        var accounts = RealAccounts().ToList();
+        var known = accounts.Where(a => a.TotalBytes is > 0).ToList();
+        long? total = known.Count > 0 ? known.Sum(a => a.TotalBytes!.Value) : null;
+        // "Free" is what the provider reports (Google already subtracts Gmail and Photos); "used" is the rest, so
+        // the two always add up to the total.
+        long? free = known.Count > 0 ? known.Sum(a => a.FreeBytes ?? Math.Max(0, a.TotalBytes!.Value - (a.UsedBytes ?? 0))) : null;
+        return new
+        {
+            accountsCount = accounts.Count,
+            usedBytes = total - free,
+            totalBytes = total,
+            freeBytes = free,
+            refreshedAt = _host.AccountsRefreshedAt == default ? (DateTime?)null : _host.AccountsRefreshedAt,
+            accounts = accounts.Select(AccountDto).ToList()
+        };
+    }
+
+    private int _accountsRefreshing;
+
+    private static double? CacheHitRate(EngineMetrics m) =>
+        m.CacheHits is { } h && m.CacheMisses is { } miss && h + miss > 0 ? Math.Round(100.0 * h / (h + miss), 1) : null;
+
+    /// <summary>
+    /// Turns a path sent by the phone into a full local path on a drive letter, or null. Refuses UNC/device paths
+    /// (\\server\share would make Windows send this user's login hash to that server), NTFS alternate data streams and
+    /// anything that is not rooted, so ".." tricks are resolved before any check.
+    /// </summary>
+    internal static string? ResolveLocalPath(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return null;
+        var p = raw.Trim().Trim('"', '\'').Replace('/', '\\');
+        if (p.StartsWith(@"\\") || p.Length < 3 || !char.IsAsciiLetter(p[0]) || p[1] != ':' || p[2] != '\\') return null;
+        if (p.IndexOf(':', 2) >= 0) return null;
+        try { return NormalizePath(Path.GetFullPath(p)); }
+        catch (Exception e) when (e is ArgumentException or NotSupportedException or PathTooLongException) { return null; }
+    }
+
+    private static string NormalizePath(string rawPath)
+    {
+        if (string.IsNullOrWhiteSpace(rawPath)) return rawPath;
+        string path = rawPath.Trim('"', '\'');
+        if (Directory.Exists(path) || File.Exists(path)) return path;
+
+        string longPath = path.StartsWith(@"\\?\") ? path : @"\\?\" + path;
+        if (Directory.Exists(longPath) || File.Exists(longPath)) return longPath;
+
+        try
+        {
+            string clean = path.TrimEnd('\\', '/');
+            int lastSep = clean.LastIndexOfAny(new[] { '\\', '/' });
+            if (lastSep > 0)
+            {
+                string parentPart = clean.Substring(0, lastSep);
+                if (parentPart.EndsWith(":")) parentPart += "\\";
+                string childPart = clean.Substring(lastSep + 1).Trim();
+
+                if (Directory.Exists(parentPart))
+                {
+                    var parentDi = new DirectoryInfo(parentPart);
+                    var dirMatch = parentDi.EnumerateDirectories()
+                        .FirstOrDefault(d => string.Equals(d.Name.Trim(), childPart, StringComparison.OrdinalIgnoreCase));
+                    if (dirMatch != null) return dirMatch.FullName;
+
+                    var fileMatch = parentDi.EnumerateFiles()
+                        .FirstOrDefault(f => string.Equals(f.Name.Trim(), childPart, StringComparison.OrdinalIgnoreCase));
+                    if (fileMatch != null) return fileMatch.FullName;
+                }
+            }
+        }
+        catch { }
+
+        return path;
+    }
+
+    private static string CleanPath(string p) => p.StartsWith(@"\\?\") ? p.Substring(4) : p;
+
+    /// <summary>What a drive really is, from its rclone backend — not guessed from its name.</summary>
+    private string ConnectionLabel(string remoteName) => _host.RemoteTypeOf(remoteName) switch
+    {
+        "drive" => "Google Drive",
+        "union" => $"Combined drive · {_host.AccountsBehind(remoteName).Count} accounts",
+        "combine" => $"One folder per account · {_host.AccountsBehind(remoteName).Count} accounts",
+        "onedrive" => "Microsoft OneDrive",
+        "webdav" => "WebDAV",
+        { } other => other,
+        null => "Cloud drive"
+    };
+
+    private static (long? Total, long? Free) DiskSpace(string root)
+    {
+        try
+        {
+            var d = new DriveInfo(root);
+            if (d.IsReady) return (d.TotalSize, d.AvailableFreeSpace);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException) { }
+        return (null, null);
+    }
+
     private async Task HandleDrivesEndpointAsync(NetworkStream stream, CancellationToken ct)
     {
+        // The phone is looking at storage right now: refresh stale quota numbers in the background for its next poll.
+        CloudStorageSummary(TimeSpan.FromSeconds(45));
+
+        // Configured cloud drives (connected or not), then connected ones that are not in settings (adopted mounts).
+        var cloud = _host.Settings.Mounts.Select(m => (Def: m, Session: _host.Mounts.Get(m.Id))).ToList();
+        foreach (var s in _host.Mounts.Sessions.Where(s => cloud.All(k => k.Def.Id != s.Id)))
+            cloud.Add((s.Definition, s));
+
         var drives = new List<object>();
-
-        // Mounted Virtual Cloud Drives
-        foreach (var s in _host.Mounts.Sessions)
+        var cloudLetters = new HashSet<char>();
+        foreach (var (def, session) in cloud)
         {
+            bool isMounted = session is { State: MountState.Mounted };
+            if (session != null) cloudLetters.Add(char.ToUpperInvariant(session.DriveLetter));
+            string letter = session?.DriveLetter.ToString() ?? def.DriveLetter ?? "Auto";
+            if (letter.Length == 1) letter += ":";
+            var (total, free) = isMounted ? DiskSpace(session!.Root) : (null, null);
+            var accounts = _host.AccountsBehind(def.RemoteName)
+                .Select(r => _host.Accounts.GetValueOrDefault(r) ?? new CloudAccountInfo(r, null, null, null, null, null, false));
+
             drives.Add(new
             {
-                id = s.Id,
-                displayName = s.Definition.DisplayName,
-                driveLetter = s.DriveLetter.ToString(),
-                root = s.Root,
-                remoteSpec = s.Definition.RemoteSpec,
-                state = s.State.ToString(),
-                isCloud = true
+                id = def.Id,
+                displayName = def.DisplayName,
+                driveLetter = letter,
+                root = isMounted ? session!.Root : null,
+                remoteSpec = _host.AccountLabel(def.RemoteName),
+                state = isMounted ? "Mounted" : session?.State.ToString() ?? "Disconnected",
+                isMounted,
+                canToggle = true,
+                isCloud = true,
+                readOnly = def.ReadOnly,
+                autoMount = def.AutoMount,
+                connectionType = ConnectionLabel(def.RemoteName),
+                totalBytes = total,
+                freeBytes = free,
+                usedBytes = total - free,
+                accounts = accounts.Select(AccountDto).ToList()
             });
         }
 
-        // Local Games Directory if configured
-        if (!string.IsNullOrEmpty(_host.Settings.LocalGamesRoot) && Directory.Exists(_host.Settings.LocalGamesRoot))
+        // This PC's own disks, for browsing only (they cannot be disconnected from a phone).
+        try
         {
-            drives.Add(new
+            foreach (var d in DriveInfo.GetDrives())
             {
-                id = "local_games",
-                displayName = "Local Games Library",
-                driveLetter = Path.GetPathRoot(_host.Settings.LocalGamesRoot)?.TrimEnd('\\') ?? "C:",
-                root = _host.Settings.LocalGamesRoot,
-                remoteSpec = "Local SSD",
-                state = "Mounted",
-                isCloud = false
-            });
+                if (d.DriveType != DriveType.Fixed || cloudLetters.Contains(char.ToUpperInvariant(d.Name[0])) || !d.IsReady) continue;
+                if (d.DriveFormat is not ("NTFS" or "exFAT" or "FAT32" or "ReFS")) continue; // leftover virtual drives are not local disks
+                drives.Add(new
+                {
+                    id = "local_" + char.ToLowerInvariant(d.Name[0]),
+                    displayName = string.IsNullOrWhiteSpace(d.VolumeLabel) ? "Local disk" : d.VolumeLabel,
+                    driveLetter = d.Name[..2],
+                    root = d.Name,
+                    remoteSpec = "This PC",
+                    state = "Active",
+                    isMounted = true,
+                    canToggle = false,
+                    isCloud = false,
+                    readOnly = false,
+                    autoMount = false,
+                    connectionType = $"Local disk · {d.DriveFormat}",
+                    totalBytes = (long?)d.TotalSize,
+                    freeBytes = (long?)d.AvailableFreeSpace,
+                    usedBytes = (long?)(d.TotalSize - d.AvailableFreeSpace),
+                    accounts = new List<object>()
+                });
+            }
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            _log.LogDebug(e, "Listing local disks failed");
         }
 
-        var json = JsonSerializer.Serialize(drives, JsonOpts);
-        await SendResponseAsync(stream, 200, "OK", "application/json; charset=utf-8", Encoding.UTF8.GetBytes(json), ct);
+        await SendJsonAsync(stream, 200, "OK", drives, ct);
     }
+
+    /// <summary>The configured drive a phone means by an id ("cloudssd") or a letter ("Z" / "Z:").</summary>
+    private MountDefinition? FindDrive(string driveId)
+    {
+        string letter = driveId.TrimEnd(':', '\\');
+        return _host.Settings.Mounts.FirstOrDefault(m => string.Equals(m.Id, driveId, StringComparison.OrdinalIgnoreCase))
+            ?? _host.Settings.Mounts.FirstOrDefault(m =>
+                string.Equals(_host.Mounts.Get(m.Id)?.DriveLetter.ToString() ?? m.DriveLetter, letter, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private async Task HandleDriveMountEndpointAsync(string method, Dictionary<string, string> queryParams, NetworkStream stream, CancellationToken ct)
+    {
+        string? driveId = queryParams.GetValueOrDefault("id") ?? queryParams.GetValueOrDefault("driveId");
+        if (method != "POST" || string.IsNullOrEmpty(driveId))
+        {
+            await SendJsonAsync(stream, 400, "Bad Request", new { success = false, error = "POST with a drive id is required." }, ct);
+            return;
+        }
+        if (FindDrive(driveId) is not { } def)
+        {
+            await SendJsonAsync(stream, 404, "Not Found", new { success = false, error = $"Drive '{driveId}' is not set up on the PC." }, ct);
+            return;
+        }
+
+        try
+        {
+            // Connecting twice would start a second rclone for the same drive letter. A drive that is already starting,
+            // or that the app is restarting by itself after a failed start, gets up to a minute to come up first.
+            for (int i = 0; i < 120 && _host.Mounts.Get(def.Id) is { State: MountState.Starting or MountState.Failed or MountState.Stopping }; i++)
+                await Task.Delay(500, ct);
+            bool already = _host.Mounts.Get(def.Id) is { State: MountState.Mounted };
+            var session = already ? _host.Mounts.Get(def.Id)! : await _host.MountAsync(def, ct);
+            if (!already) _host.SaveSettings();
+            StatusChanged?.Invoke();
+            await SendJsonAsync(stream, 200, "OK", new
+            {
+                success = true,
+                message = already ? $"{def.DisplayName} is already connected as {session.DriveLetter}:" : $"{def.DisplayName} connected as {session.DriveLetter}:",
+                id = def.Id,
+                driveLetter = session.DriveLetter + ":",
+                root = session.Root,
+                state = session.State.ToString()
+            }, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _log.LogError(ex, "Failed to mount drive {Id}", driveId);
+            await SendJsonAsync(stream, 500, "Internal Server Error", new { success = false, error = $"Could not connect {def.DisplayName}: {ex.Message}" }, ct);
+        }
+    }
+
+    private async Task HandleDriveUnmountEndpointAsync(string method, Dictionary<string, string> queryParams, NetworkStream stream, CancellationToken ct)
+    {
+        string? driveId = queryParams.GetValueOrDefault("id") ?? queryParams.GetValueOrDefault("driveId");
+        if (method != "POST" || string.IsNullOrEmpty(driveId))
+        {
+            await SendJsonAsync(stream, 400, "Bad Request", new { success = false, error = "POST with a drive id is required." }, ct);
+            return;
+        }
+
+        string targetId = FindDrive(driveId)?.Id ?? driveId;
+        var session = _host.Mounts.Get(targetId);
+        if (session is null)
+        {
+            await SendJsonAsync(stream, 200, "OK", new { success = true, message = "Drive is already disconnected", id = targetId }, ct);
+            return;
+        }
+        if (_host.CurrentLaunch is { State: Games.LaunchState.Running } l && l.Game.MountId == targetId)
+        {
+            // The desktop app asks first; a phone tap must not pull the drive out from under a running game.
+            await SendJsonAsync(stream, 409, "Conflict", new { success = false, error = $"{l.Game.Name} is running from this drive. Close the game first." }, ct);
+            return;
+        }
+
+        try
+        {
+            string name = session.Definition.DisplayName;
+            // Waits (up to a minute) for files that are still uploading, exactly like Disconnect in the desktop app.
+            await _host.UnmountAsync(targetId);
+            StatusChanged?.Invoke();
+            await SendJsonAsync(stream, 200, "OK", new { success = true, message = $"{name} disconnected", id = targetId }, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _log.LogError(ex, "Failed to unmount drive {Id}", driveId);
+            await SendJsonAsync(stream, 500, "Internal Server Error", new { success = false, error = $"Could not disconnect: {ex.Message}" }, ct);
+        }
+    }
+
+    private static object FileDto(FileInfo file)
+    {
+        string ext = file.Extension.ToLowerInvariant();
+        return new
+        {
+            name = file.Name,
+            path = CleanPath(file.FullName),
+            size = file.Length,
+            sizeFormatted = ByteSize.Format(file.Length),
+            modified = file.LastWriteTimeUtc,
+            extension = ext,
+            isVideo = ext is ".mp4" or ".mkv" or ".webm" or ".avi" or ".mov" or ".m4v",
+            isAudio = ext is ".mp3" or ".wav" or ".flac" or ".aac" or ".ogg" or ".m4a",
+            isSave = ext is ".sav" or ".save" or ".dat" or ".bin" || file.Name.Contains("save", StringComparison.OrdinalIgnoreCase)
+        };
+    }
+
+    private static bool MatchesCategory(string category, string ext, string name) => category switch
+    {
+        "videos" => ext is ".mp4" or ".mkv" or ".webm" or ".avi" or ".mov" or ".m4v",
+        "audio" => ext is ".mp3" or ".wav" or ".flac" or ".aac" or ".ogg" or ".m4a",
+        "images" => ext is ".jpg" or ".jpeg" or ".png" or ".webp" or ".gif" or ".bmp" or ".svg",
+        "documents" or "docs" => ext is ".pdf" or ".doc" or ".docx" or ".txt" or ".xlsx" or ".pptx" or ".csv" or ".md" or ".json",
+        "apps" or "archives" => ext is ".apk" or ".zip" or ".rar" or ".7z" or ".iso" or ".exe" or ".msi",
+        "saves" => ext is ".sav" or ".save" or ".dat" or ".bin" || name.Contains("save", StringComparison.OrdinalIgnoreCase),
+        _ => true
+    };
 
     private async Task HandleFilesEndpointAsync(Dictionary<string, string> queryParams, NetworkStream stream, CancellationToken ct)
     {
         string? targetPath = queryParams.GetValueOrDefault("path");
+        if (!string.IsNullOrEmpty(targetPath) && (targetPath = ResolveLocalPath(targetPath)) is null)
+        {
+            await SendJsonAsync(stream, 400, "Bad Request", new { error = "Invalid path" }, ct);
+            return;
+        }
         string? category = queryParams.GetValueOrDefault("category")?.ToLowerInvariant();
         string? searchQuery = queryParams.GetValueOrDefault("search")?.ToLowerInvariant();
 
-        // If path is empty, default to mounted drive Z:\, active session, or Cloud-SSD Uploads folder
+        // No path: the uploads folder for "what did my phone send", else the first connected cloud drive.
         if (string.IsNullOrEmpty(targetPath))
         {
-            string uploadsDir = _host.Settings.MobileBridge.UploadDirectory 
-                ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "Cloud-SSD_Uploads");
-
-            if ((category == "downloads" || category == "uploads") && Directory.Exists(uploadsDir))
-            {
-                targetPath = uploadsDir;
-            }
-            else if (Directory.Exists(@"Z:\"))
-            {
-                targetPath = @"Z:\";
-            }
+            if (category is "downloads" or "uploads" && Directory.Exists(UploadDirectory))
+                targetPath = UploadDirectory;
             else
+                targetPath = (_host.Mounts.Get(AppHost.CombinedMountId) is { State: MountState.Mounted } all
+                    ? all : _host.Mounts.Sessions.FirstOrDefault(s => s.State == MountState.Mounted))?.Root;
+
+            if (targetPath is null)
             {
-                targetPath = _host.Mounts.Sessions.FirstOrDefault()?.Root
-                    ?? _host.Settings.LocalGamesRoot;
-                
-                if (string.IsNullOrEmpty(targetPath) || !Directory.Exists(targetPath))
-                {
-                    targetPath = Directory.Exists(uploadsDir) 
-                        ? uploadsDir 
-                        : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
-                }
+                await SendJsonAsync(stream, 404, "Not Found", new { error = "No cloud drive is connected on the PC.", driveMissing = true }, ct);
+                return;
             }
         }
 
+        targetPath = NormalizePath(targetPath);
+
         if (!Directory.Exists(targetPath))
         {
-            var notFound = JsonSerializer.Serialize(new { error = "Directory not found", path = targetPath }, JsonOpts);
-            await SendResponseAsync(stream, 404, "Not Found", "application/json; charset=utf-8", Encoding.UTF8.GetBytes(notFound), ct);
+            string root = Path.GetPathRoot(CleanPath(targetPath)) ?? "";
+            bool driveMissing = root.Length > 0 && !Directory.Exists(root);
+            await SendJsonAsync(stream, 404, "Not Found", new
+            {
+                error = driveMissing ? $"Drive {root.TrimEnd('\\')} is not connected on the PC." : "Folder not found",
+                path = CleanPath(targetPath),
+                driveMissing
+            }, ct);
             return;
         }
 
         var dirInfo = new DirectoryInfo(targetPath);
+        string? parent = dirInfo.Parent != null ? CleanPath(dirInfo.Parent.FullName) : null;
 
         // Recursive category or search filter
         if (!string.IsNullOrEmpty(category) || !string.IsNullOrEmpty(searchQuery))
         {
-            var matchedFiles = new List<object>();
+            var matched = new List<object>();
+            bool truncated = false;
             try
             {
                 var opt = new EnumerationOptions
                 {
                     RecurseSubdirectories = true,
-                    MaxRecursionDepth = 2,
+                    MaxRecursionDepth = string.IsNullOrEmpty(searchQuery) ? 2 : 3,
                     IgnoreInaccessible = true,
                     AttributesToSkip = FileAttributes.Hidden | FileAttributes.System
                 };
 
-                foreach (var file in dirInfo.EnumerateFiles("*.*", opt))
+                // A cloud drive answers every folder with a round trip, so a deep search gets a time budget.
+                var clock = Stopwatch.StartNew();
+                foreach (var file in dirInfo.EnumerateFiles("*", opt))
                 {
-                    string ext = file.Extension.ToLowerInvariant();
-                    bool isVideo = ext is ".mp4" or ".mkv" or ".webm" or ".avi" or ".mov" or ".m4v";
-                    bool isAudio = ext is ".mp3" or ".wav" or ".flac" or ".aac" or ".ogg" or ".m4a";
-                    bool isImage = ext is ".jpg" or ".jpeg" or ".png" or ".webp" or ".gif" or ".bmp" or ".svg";
-                    bool isDoc = ext is ".pdf" or ".doc" or ".docx" or ".txt" or ".xlsx" or ".pptx" or ".csv" or ".md" or ".json";
-                    bool isApp = ext is ".apk" or ".zip" or ".rar" or ".7z" or ".iso" or ".exe" or ".msi";
-                    bool isSave = ext is ".sav" or ".save" or ".dat" or ".bin" || file.Name.Contains("save", StringComparison.OrdinalIgnoreCase);
-
-                    bool matches = true;
-                    if (!string.IsNullOrEmpty(category))
-                    {
-                        matches = category switch
-                        {
-                            "videos" => isVideo,
-                            "audio" => isAudio,
-                            "images" => isImage,
-                            "documents" or "docs" => isDoc,
-                            "apps" or "archives" => isApp,
-                            "saves" => isSave,
-                            "downloads" or "uploads" => true,
-                            _ => true
-                        };
-                    }
-
-                    if (matches && !string.IsNullOrEmpty(searchQuery))
-                    {
-                        matches = file.Name.Contains(searchQuery, StringComparison.OrdinalIgnoreCase);
-                    }
-
-                    if (matches)
-                    {
-                        matchedFiles.Add(new
-                        {
-                            name = file.Name,
-                            path = file.FullName,
-                            size = file.Length,
-                            sizeFormatted = ByteSize.Format(file.Length),
-                            modified = file.LastWriteTimeUtc,
-                            extension = ext,
-                            isVideo,
-                            isAudio,
-                            isSave
-                        });
-
-                        if (matchedFiles.Count >= 150) break;
-                    }
+                    if (clock.Elapsed > TimeSpan.FromSeconds(10) || ct.IsCancellationRequested) { truncated = true; break; }
+                    if (!string.IsNullOrEmpty(category) && !MatchesCategory(category, file.Extension.ToLowerInvariant(), file.Name)) continue;
+                    if (!string.IsNullOrEmpty(searchQuery) && !file.Name.Contains(searchQuery, StringComparison.OrdinalIgnoreCase)) continue;
+                    matched.Add(FileDto(file));
+                    if (matched.Count >= 150) { truncated = true; break; }
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 _log.LogDebug(ex, "Error scanning category/search files in {Path}", targetPath);
             }
 
-            var catResult = new
+            await SendJsonAsync(stream, 200, "OK", new
             {
-                currentPath = dirInfo.FullName,
-                parentPath = dirInfo.Parent?.FullName,
+                currentPath = CleanPath(dirInfo.FullName),
+                parentPath = parent,
                 folders = Array.Empty<object>(),
-                files = matchedFiles
-            };
-
-            var catJson = JsonSerializer.Serialize(catResult, JsonOpts);
-            await SendResponseAsync(stream, 200, "OK", "application/json; charset=utf-8", Encoding.UTF8.GetBytes(catJson), ct);
+                files = matched,
+                truncated
+            }, ct);
             return;
         }
 
-        var folders = new List<object>();
-        var files = new List<object>();
-
+        var folders = new List<DirectoryInfo>();
+        var files = new List<FileInfo>();
         try
         {
-            foreach (var sub in dirInfo.EnumerateDirectories())
+            // One pass over the folder: on a cloud drive every enumeration is a round trip to the provider.
+            var opt = new EnumerationOptions { IgnoreInaccessible = true, AttributesToSkip = FileAttributes.Hidden | FileAttributes.System };
+            foreach (var entry in dirInfo.EnumerateFileSystemInfos("*", opt))
             {
-                if (sub.Attributes.HasFlag(FileAttributes.Hidden)) continue;
-                folders.Add(new
-                {
-                    name = sub.Name,
-                    path = sub.FullName,
-                    modified = sub.LastWriteTimeUtc
-                });
-            }
-
-            foreach (var file in dirInfo.EnumerateFiles())
-            {
-                if (file.Attributes.HasFlag(FileAttributes.Hidden)) continue;
-                string ext = file.Extension.ToLowerInvariant();
-                bool isVideo = ext is ".mp4" or ".mkv" or ".webm" or ".avi" or ".mov" or ".m4v";
-                bool isAudio = ext is ".mp3" or ".wav" or ".flac" or ".aac" or ".ogg" or ".m4a";
-                bool isSave = ext is ".sav" or ".save" or ".dat" or ".bin" || file.Name.Contains("save", StringComparison.OrdinalIgnoreCase);
-
-                files.Add(new
-                {
-                    name = file.Name,
-                    path = file.FullName,
-                    size = file.Length,
-                    sizeFormatted = ByteSize.Format(file.Length),
-                    modified = file.LastWriteTimeUtc,
-                    extension = ext,
-                    isVideo,
-                    isAudio,
-                    isSave
-                });
+                if (entry is DirectoryInfo sub) folders.Add(sub);
+                else if (entry is FileInfo file) files.Add(file);
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
+            // An error is not an empty folder: tell the phone, so it does not show "Folder is empty".
             _log.LogDebug(ex, "Error reading directory {Path}", targetPath);
+            await SendJsonAsync(stream, 500, "Internal Server Error", new { error = "The PC could not read this folder: " + ex.Message, path = CleanPath(targetPath) }, ct);
+            return;
         }
 
-        string? parent = dirInfo.Parent?.FullName;
-
-        var result = new
+        await SendJsonAsync(stream, 200, "OK", new
         {
-            currentPath = dirInfo.FullName,
+            currentPath = CleanPath(dirInfo.FullName),
             parentPath = parent,
-            folders,
-            files
-        };
+            driveRoot = Path.GetPathRoot(CleanPath(dirInfo.FullName)),
+            folders = folders.OrderBy(d => d.Name, StringComparer.OrdinalIgnoreCase)
+                .Select(d => new { name = d.Name, path = CleanPath(d.FullName), modified = d.LastWriteTimeUtc }),
+            files = files.OrderBy(f => f.Name, StringComparer.OrdinalIgnoreCase).Select(FileDto)
+        }, ct);
+    }
 
-        var json = JsonSerializer.Serialize(result, JsonOpts);
-        await SendResponseAsync(stream, 200, "OK", "application/json; charset=utf-8", Encoding.UTF8.GetBytes(json), ct);
+    private async Task HandleRemoteEndpointAsync(string method, Dictionary<string, string> queryParams, NetworkStream stream, CancellationToken ct)
+    {
+        string action = queryParams.GetValueOrDefault("action", "");
+        if (method != "POST")
+            await SendJsonAsync(stream, 405, "Method Not Allowed", new { success = false, error = "Use POST." }, ct);
+        else if (!MediaKeys.TryPress(action))
+            await SendJsonAsync(stream, 400, "Bad Request", new { success = false, error = $"Unknown remote action '{action}'." }, ct);
+        else
+            await SendJsonAsync(stream, 200, "OK", new { success = true, action = action.ToLowerInvariant() }, ct);
     }
 
     private async Task HandleStreamEndpointAsync(
@@ -803,7 +1217,7 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
         string clientIp,
         CancellationToken ct)
     {
-        string? filePath = queryParams.GetValueOrDefault("path");
+        string? filePath = ResolveLocalPath(queryParams.GetValueOrDefault("path"));
         if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
         {
             await SendResponseAsync(stream, 404, "Not Found", "text/plain", Encoding.UTF8.GetBytes("File not found"), ct);
@@ -818,19 +1232,15 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
         long end = totalLength - 1;
         bool isRange = false;
 
-        if (headers.TryGetValue("Range", out var rangeHeader) && rangeHeader.StartsWith("bytes=", StringComparison.OrdinalIgnoreCase))
+        if (headers.TryGetValue("Range", out var rangeHeader))
         {
+            if (ParseRange(rangeHeader, totalLength) is not { } range)
+            {
+                await SendResponseAsync(stream, 416, "Range Not Satisfiable", "text/plain", [], ct, $"Content-Range: bytes */{totalLength}");
+                return;
+            }
+            (start, end) = range;
             isRange = true;
-            var rangeValue = rangeHeader[6..].Trim();
-            var parts = rangeValue.Split('-');
-            if (long.TryParse(parts[0], out long parsedStart))
-            {
-                start = parsedStart;
-            }
-            if (parts.Length > 1 && long.TryParse(parts[1], out long parsedEnd))
-            {
-                end = Math.Min(parsedEnd, totalLength - 1);
-            }
         }
 
         long chunkLength = Math.Max(0, end - start + 1);
@@ -852,7 +1262,7 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
         headerSb.Append("Access-Control-Allow-Origin: *\r\n");
         headerSb.Append("Access-Control-Allow-Methods: GET, POST, OPTIONS, HEAD\r\n");
         headerSb.Append("Access-Control-Allow-Headers: *\r\n");
-        headerSb.Append("Connection: keep-alive\r\n\r\n");
+        headerSb.Append("Connection: close\r\n\r\n"); // one request per connection
 
         byte[] headerBytes = Encoding.UTF8.GetBytes(headerSb.ToString());
         await stream.WriteAsync(headerBytes, ct);
@@ -901,7 +1311,7 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
         string clientIp,
         CancellationToken ct)
     {
-        string? filePath = queryParams.GetValueOrDefault("path");
+        string? filePath = ResolveLocalPath(queryParams.GetValueOrDefault("path"));
         if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
         {
             await SendResponseAsync(stream, 404, "Not Found", "text/plain", Encoding.UTF8.GetBytes("File not found"), ct);
@@ -964,70 +1374,69 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
 
         Directory.CreateDirectory(uploadDir);
 
-        string filename = queryParams.GetValueOrDefault("filename") ?? $"upload_{DateTimeOffset.Now:yyyyMMdd_HHmmss}.bin";
-        // Sanitize filename
-        filename = Path.GetFileName(filename);
-        string destPath = Path.Combine(uploadDir, filename);
+        string filename = SafeUploadName(queryParams.GetValueOrDefault("filename"));
 
-        long contentLength = 0;
-        if (headers.TryGetValue("Content-Length", out var clStr))
+        long contentLength = -1;
+        if (headers.TryGetValue("Content-Length", out var clStr) && !long.TryParse(clStr, out contentLength)) contentLength = -1;
+        bool chunked = headers.TryGetValue("Transfer-Encoding", out var te) && te.Contains("chunked", StringComparison.OrdinalIgnoreCase);
+        if (contentLength < 0 && !chunked)
         {
-            long.TryParse(clStr, out contentLength);
+            await SendJsonAsync(stream, 411, "Length Required", new { success = false, error = "Upload needs a Content-Length or chunked transfer encoding." }, ct);
+            return;
         }
+
+        // Keep the same 10 GB reserve the cache uses, so a phone can never fill the PC's disk.
+        const long reserveBytes = 10L * 1024 * 1024 * 1024;
+        long free = new DriveInfo(Path.GetPathRoot(Path.GetFullPath(uploadDir))!).AvailableFreeSpace;
+        long budget = free - reserveBytes;
+        if (contentLength > budget)
+        {
+            await SendJsonAsync(stream, 507, "Insufficient Storage", new { success = false, error = $"Not enough free space on the PC ({ByteSize.Format(Math.Max(0, free))} free, 10 GB is kept in reserve)." }, ct);
+            return;
+        }
+
+        // Never overwrite: "photo.jpg" becomes "photo (1).jpg" when it already exists.
+        string destPath = Path.Combine(uploadDir, filename);
+        for (int n = 1; File.Exists(destPath); n++)
+            destPath = Path.Combine(uploadDir, $"{Path.GetFileNameWithoutExtension(filename)} ({n}){Path.GetExtension(filename)}");
+        filename = Path.GetFileName(destPath);
 
         long savedSize = 0;
+        bool complete;
         var sw = Stopwatch.StartNew();
-
-        // Direct stream upload to disk
-        if (contentLength > 0)
+        try
         {
-            await using (var destFile = new FileStream(destPath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite, 64 * 1024, useAsync: true))
+            await using var destFile = new FileStream(destPath, FileMode.CreateNew, FileAccess.Write, FileShare.Read, 64 * 1024, useAsync: true);
+            var body = chunked ? (Stream)new ChunkedBodyStream(stream) : stream;
+            long limit = chunked ? budget : contentLength;
+            byte[] buffer = new byte[64 * 1024];
+            while (savedSize < limit)
             {
-                const int bufferSize = 64 * 1024;
-                byte[] buffer = new byte[bufferSize];
-                long bytesReadTotal = 0;
-
-                while (bytesReadTotal < contentLength)
-                {
-                    int toRead = (int)Math.Min(buffer.Length, contentLength - bytesReadTotal);
-                    int read = await stream.ReadAsync(buffer.AsMemory(0, toRead), ct);
-                    if (read == 0) break;
-
-                    await destFile.WriteAsync(buffer.AsMemory(0, read), ct);
-                    bytesReadTotal += read;
-                    TrackBytes(read);
-                }
-                await destFile.FlushAsync(ct);
-                savedSize = destFile.Length;
+                int read = await body.ReadAsync(buffer.AsMemory(0, (int)Math.Min(buffer.Length, limit - savedSize)), ct);
+                if (read == 0) break;
+                await destFile.WriteAsync(buffer.AsMemory(0, read), ct);
+                savedSize += read;
+                TrackBytes(read);
             }
+            complete = chunked ? ((ChunkedBodyStream)body).Finished : savedSize == contentLength;
         }
-        else
+        catch (Exception e) when (e is IOException or InvalidDataException or OperationCanceledException)
         {
-            await using (var destFile = new FileStream(destPath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite, 64 * 1024, useAsync: true))
-            {
-                const int bufferSize = 64 * 1024;
-                byte[] buffer = new byte[bufferSize];
-                int read;
-                while ((read = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), ct)) > 0)
-                {
-                    await destFile.WriteAsync(buffer.AsMemory(0, read), ct);
-                    savedSize += read;
-                    TrackBytes(read);
-                    if (!stream.DataAvailable)
-                    {
-                        await Task.Delay(40, ct);
-                        if (!stream.DataAvailable) break;
-                    }
-                }
-                await destFile.FlushAsync(ct);
-                savedSize = destFile.Length;
-            }
+            complete = false;
         }
         sw.Stop();
 
         double elapsed = Math.Max(0.01, sw.Elapsed.TotalSeconds);
         double speedMBps = (savedSize / (1024.0 * 1024.0)) / elapsed;
         string devName = ResolveDeviceName(clientIp);
+
+        if (!complete)
+        {
+            try { File.Delete(destPath); } catch (IOException) { }
+            RecordTransfer(filename, destPath, savedSize, "upload", devName, clientIp, speedMBps, "Interrupted");
+            await SendJsonAsync(stream, 400, "Bad Request", new { success = false, error = "The upload was cut off or too large for the free space; nothing was saved." }, ct);
+            return;
+        }
 
         FileTransferred?.Invoke(filename, savedSize);
         RecordTransfer(filename, destPath, savedSize, "upload", devName, clientIp, speedMBps, "Completed");
@@ -1042,6 +1451,17 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
         }, JsonOpts);
 
         await SendResponseAsync(stream, 200, "OK", "application/json; charset=utf-8", Encoding.UTF8.GetBytes(resp), ct);
+    }
+
+    /// <summary>A plain file name: no folders, no ":" (NTFS alternate data streams), no reserved device names.</summary>
+    internal static string SafeUploadName(string? requested)
+    {
+        var name = Path.GetFileName((requested ?? "").Replace('\\', '/').Split('/').Last());
+        name = new string(name.Select(c => Path.GetInvalidFileNameChars().Contains(c) || c == ':' ? '_' : c).ToArray()).Trim().TrimEnd('.');
+        var stem = Path.GetFileNameWithoutExtension(name).ToUpperInvariant();
+        if (name.Length == 0 || stem is "CON" or "PRN" or "AUX" or "NUL" || (stem.Length == 4 && (stem.StartsWith("COM") || stem.StartsWith("LPT")) && char.IsDigit(stem[3])))
+            name = $"upload_{DateTimeOffset.Now:yyyyMMdd_HHmmss}" + (name.Length > 0 ? "_" + name : ".bin");
+        return name.Length > 200 ? name[..150] + Path.GetExtension(name) : name;
     }
 
     private async Task HandleTransfersEndpointAsync(NetworkStream stream, CancellationToken ct)
@@ -1211,39 +1631,32 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
 
     private async Task HandleCleanEndpointAsync(NetworkStream stream, CancellationToken ct)
     {
+        // Only caches of disconnected drives, through the same safe path as the desktop app: it refuses folders that
+        // are not Cloud-SSD caches and keeps files whose changes were not uploaded yet. Connected drives are trimmed
+        // by rclone itself (deleting their files underneath it could lose pending uploads).
         long freedBytes = 0;
-        try
+        var notes = new List<string>();
+        var cacheRoot = _host.Paths.CacheRootFor(_host.Settings);
+        foreach (var m in _host.Settings.Mounts.Where(m => _host.Mounts.Get(m.Id) == null))
         {
-            var cacheRoot = _host.Paths.CacheRootFor(_host.Settings);
-            if (Directory.Exists(cacheRoot))
+            try
             {
-                var dir = new DirectoryInfo(cacheRoot);
-                foreach (var f in dir.EnumerateFiles("*.*", SearchOption.AllDirectories))
-                {
-                    try
-                    {
-                        if (f.LastAccessTimeUtc < DateTime.UtcNow.AddHours(-1) && !f.Name.StartsWith('.'))
-                        {
-                            long len = f.Length;
-                            f.Delete();
-                            freedBytes += len;
-                        }
-                    }
-                    catch { }
-                }
+                var r = Cache.CacheMaintenance.ClearMountCache(_host.Paths.MountCacheDir(_host.Settings, m.Id), cacheRoot);
+                freedBytes += r.BytesFreed;
+                if (!r.Cleared) notes.Add($"{m.DisplayName}: {r.Message}");
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                notes.Add($"{m.DisplayName}: {ex.Message}");
             }
         }
-        catch (Exception ex)
-        {
-            _log.LogDebug(ex, "Error during cache cleaning");
-        }
 
-        long reportedFreed = Math.Max(freedBytes, 2_450_000_000L);
         var resp = JsonSerializer.Serialize(new
         {
             success = true,
-            freedBytes = reportedFreed,
-            freedFormatted = ByteSize.Format(reportedFreed)
+            freedBytes,
+            freedFormatted = ByteSize.Format(freedBytes),
+            notes
         }, JsonOpts);
 
         await SendResponseAsync(stream, 200, "OK", "application/json; charset=utf-8", Encoding.UTF8.GetBytes(resp), ct);
@@ -1261,9 +1674,16 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
             baseDir = Path.Combine(AppContext.BaseDirectory, "wwwroot", "mobile");
         }
 
-        string fullPath = Path.Combine(baseDir, path.Replace('/', '\\'));
+        // Only files inside wwwroot\mobile: Path.Combine would happily return "C:\..." or "\\server\..." as-is.
+        string? fullPath = null;
+        var rel = Uri.UnescapeDataString(path).Replace('/', '\\');
+        if (!rel.Contains(':') && !rel.StartsWith('\\'))
+        {
+            var candidate = Path.GetFullPath(Path.Combine(baseDir, rel));
+            if (candidate.StartsWith(Path.GetFullPath(baseDir).TrimEnd('\\') + "\\", StringComparison.OrdinalIgnoreCase)) fullPath = candidate;
+        }
 
-        if (File.Exists(fullPath))
+        if (fullPath != null && File.Exists(fullPath))
         {
             byte[] fileBytes = await File.ReadAllBytesAsync(fullPath, ct);
             string mime = GetMimeType(Path.GetExtension(fullPath));
@@ -1364,22 +1784,40 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
         _ => "application/octet-stream"
     };
 
+    /// <summary>File types the phone may open on the PC: viewers only, nothing that executes code or follows a link.</summary>
+    internal static readonly HashSet<string> OpenablePcExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".heic", ".tif", ".tiff",
+        ".mp4", ".m4v", ".mkv", ".webm", ".avi", ".mov", ".wmv",
+        ".mp3", ".wav", ".ogg", ".flac", ".m4a", ".aac", ".wma",
+        ".pdf", ".txt", ".log", ".md", ".csv", ".docx", ".xlsx", ".pptx", ".odt", ".ods", ".odp", ".rtf",
+        ".zip", ".7z", ".rar",
+    };
+
     private async Task HandleOpenPcEndpointAsync(
         Dictionary<string, string> queryParams,
         NetworkStream stream,
         CancellationToken ct)
     {
-        string? filePath = queryParams.GetValueOrDefault("path");
+        string? filePath = ResolveLocalPath(queryParams.GetValueOrDefault("path"));
         if (string.IsNullOrEmpty(filePath) || (!File.Exists(filePath) && !Directory.Exists(filePath)))
         {
             var notFound = JsonSerializer.Serialize(new { success = false, error = "File not found" }, JsonOpts);
             await SendResponseAsync(stream, 404, "Not Found", "application/json; charset=utf-8", Encoding.UTF8.GetBytes(notFound), ct);
             return;
         }
+        bool isDir = Directory.Exists(filePath);
+        if (!isDir && !OpenablePcExtensions.Contains(Path.GetExtension(filePath)))
+        {
+            // Opening a program, script or shortcut from the phone would let any paired phone run code on this PC.
+            await SendJsonAsync(stream, 403, "Forbidden", new { success = false, error = "For safety, programs, scripts and shortcuts can't be opened from the phone. Media, documents and folders can." }, ct);
+            return;
+        }
 
         try
         {
-            Process.Start(new ProcessStartInfo(filePath) { UseShellExecute = true });
+            if (isDir) Process.Start(new ProcessStartInfo("explorer.exe") { ArgumentList = { CleanPath(filePath) } });
+            else Process.Start(new ProcessStartInfo(filePath) { UseShellExecute = true });
             var ok = JsonSerializer.Serialize(new { success = true, message = $"Opened '{Path.GetFileName(filePath)}' on PC" }, JsonOpts);
             await SendResponseAsync(stream, 200, "OK", "application/json; charset=utf-8", Encoding.UTF8.GetBytes(ok), ct);
         }
@@ -1396,7 +1834,7 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
         NetworkStream stream,
         CancellationToken ct)
     {
-        string? filePath = queryParams.GetValueOrDefault("path");
+        string? filePath = ResolveLocalPath(queryParams.GetValueOrDefault("path"));
         if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
         {
             var notFound = JsonSerializer.Serialize(new { success = false, error = "File not found" }, JsonOpts);
@@ -1413,7 +1851,8 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
             byte[] buffer = new byte[readLength];
             await using (var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
             {
-                int bytesRead = await fs.ReadAsync(buffer, 0, (int)readLength, ct);
+                // A cloud drive returns data in pieces, so keep reading until the buffer is full or the file ends.
+                int bytesRead = await fs.ReadAtLeastAsync(buffer, (int)readLength, throwOnEndOfStream: false, ct);
                 if (bytesRead < readLength)
                 {
                     Array.Resize(ref buffer, bytesRead);
@@ -1463,11 +1902,13 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
         string statusText,
         string contentType,
         byte[] body,
-        CancellationToken ct)
+        CancellationToken ct,
+        string? extraHeader = null)
     {
         var sb = new StringBuilder();
         sb.Append($"HTTP/1.1 {statusCode} {statusText}\r\n");
         sb.Append($"Content-Type: {contentType}\r\n");
+        if (extraHeader != null) sb.Append(extraHeader).Append("\r\n");
         sb.Append($"Content-Length: {body.Length}\r\n");
         sb.Append("Access-Control-Allow-Origin: *\r\n");
         sb.Append("Access-Control-Allow-Methods: GET, POST, OPTIONS, HEAD\r\n");
@@ -1485,6 +1926,33 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
         await stream.FlushAsync(ct);
     }
 
+    /// <summary>
+    /// Parses a single-range "bytes=" header: "a-b", "a-" or the suffix form "-n" (last n bytes). Null means
+    /// unsatisfiable (416). A multi-range request is answered with its first range.
+    /// </summary>
+    internal static (long Start, long End)? ParseRange(string header, long length)
+    {
+        if (!header.StartsWith("bytes=", StringComparison.OrdinalIgnoreCase) || length <= 0) return null;
+        var spec = header[6..].Split(',')[0].Trim();
+        int dash = spec.IndexOf('-');
+        if (dash < 0) return null;
+        var a = spec[..dash].Trim();
+        var b = spec[(dash + 1)..].Trim();
+        if (a.Length == 0)
+        {
+            if (!long.TryParse(b, out var n) || n <= 0) return null;
+            return (Math.Max(0, length - n), length - 1);
+        }
+        if (!long.TryParse(a, out var start) || start < 0 || start >= length) return null;
+        long end = length - 1;
+        if (b.Length > 0)
+        {
+            if (!long.TryParse(b, out var e) || e < start) return null;
+            end = Math.Min(e, length - 1);
+        }
+        return (start, end);
+    }
+
     private static Dictionary<string, string> ParseQuery(string query)
     {
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -1493,16 +1961,18 @@ public sealed class LocalMobileBridgeService : IAsyncDisposable
         var pairs = query.Split('&', StringSplitOptions.RemoveEmptyEntries);
         foreach (var p in pairs)
         {
+            // In a query string "+" is a space (browsers' URLSearchParams and Java's URLEncoder write it that way);
+            // a real plus sign arrives as %2B. Without this "Z:\My Folder" came in as "Z:\My+Folder" → 404.
             int eq = p.IndexOf('=');
             if (eq > 0)
             {
-                var k = Uri.UnescapeDataString(p[..eq]);
-                var v = Uri.UnescapeDataString(p[(eq + 1)..]);
+                var k = Uri.UnescapeDataString(p[..eq].Replace('+', ' '));
+                var v = Uri.UnescapeDataString(p[(eq + 1)..].Replace('+', ' '));
                 result[k] = v;
             }
             else
             {
-                result[Uri.UnescapeDataString(p)] = "";
+                result[Uri.UnescapeDataString(p.Replace('+', ' '))] = "";
             }
         }
         return result;

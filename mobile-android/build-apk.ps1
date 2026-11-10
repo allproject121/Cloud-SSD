@@ -41,7 +41,7 @@ if ($LASTEXITCODE -ne 0) { throw "javac failed" }
 
 Write-Host "4. Dexing classes with D8..." -ForegroundColor Cyan
 $classFiles = Get-ChildItem "$build\classes" -Recurse -Filter "*.class" | ForEach-Object { $_.FullName }
-& $d8 @classFiles --output "$build\dex"
+& $d8 @classFiles --lib $jar --min-api 24 --output "$build\dex"
 if ($LASTEXITCODE -ne 0) { throw "d8 failed" }
 
 Write-Host "5. Packaging classes.dex into APK..." -ForegroundColor Cyan

@@ -105,7 +105,12 @@ public sealed class CacheLifecycleTests(ITestOutputHelper output)
             cache: c => c.PollInterval = TimeSpan.FromSeconds(3), minFree: free + ByteSize.TiB);
         Assert.Equal(D.Hashes["Game Data/level 2.pak"], Bytes.HashFile(h.P("Game Data/level 2.pak")));
         CacheUsage usage = CacheInspector.Measure(cache);
-        for (int i = 0; i < 40 && usage.CachedBytes > 0; i++)
+        // Wait for both conditions. rclone writes the range index only when the cached handle really closes (5 s after
+        // the last close), so "0 B indexed" is also what the index shows *before* that close - waiting on it alone
+        // returned immediately and measured the data file while rclone was still inside its handle-caching grace
+        // period (rclone log: closed 23.31, "Grace period item skipped" 25.68, removed 28.69). Eviction is due within
+        // handle-caching (5 s) + one cleaner poll (3 s), well inside this 20 s budget.
+        for (int i = 0; i < 40 && (usage.CachedBytes > 0 || usage.PhysicalBytes >= Dataset.PakSize / 4); i++)
         {
             await Task.Delay(500);
             usage = CacheInspector.Measure(cache);

@@ -23,8 +23,8 @@ public sealed class SmartOffloadStatus
 {
     public bool Enabled { get; set; }
     public double MinFreeSpaceThresholdGB { get; set; }
-    public string TargetDriveName { get; set; } = "Cloud-SSD (15TB) (Z:)";
-    public string TargetDriveLetter { get; set; } = "Z";
+    public string TargetDriveName { get; set; } = "No cloud drive connected";
+    public string TargetDriveLetter { get; set; } = "";
     public double LaptopFreeSpaceGB { get; set; }
     public double LaptopTotalSpaceGB { get; set; }
     public double LaptopUsedPercentage { get; set; }
@@ -91,8 +91,8 @@ public sealed class SmartStorageOffloaderService
         var mount = _host.Mounts.Sessions.FirstOrDefault(s => s.Id == settings.TargetMountId && s.State == MountState.Mounted)
             ?? _host.Mounts.Sessions.FirstOrDefault(s => s.State == MountState.Mounted && !s.Definition.ReadOnly);
 
-        string driveName = mount != null ? $"{mount.Definition.DisplayName} ({mount.DriveLetter}:)" : "Cloud-SSD (15TB) (Z:)";
-        string driveLetter = mount != null ? mount.DriveLetter.ToString() : "Z";
+        string driveName = mount != null ? $"{mount.Definition.DisplayName} ({mount.DriveLetter}:)" : "No cloud drive connected";
+        string driveLetter = mount != null ? mount.DriveLetter.ToString() : "";
 
         return new SmartOffloadStatus
         {

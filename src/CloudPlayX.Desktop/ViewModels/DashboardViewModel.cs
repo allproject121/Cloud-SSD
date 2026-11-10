@@ -15,7 +15,7 @@ public sealed partial class DashboardViewModel : PageViewModel
 
     public DashboardViewModel(AppHost host, Action<string> navigate) : base(host, "Dashboard", "") => _navigate = navigate;
 
-    public ObservableCollection<KeyValueRow> Accounts { get; } = new();
+    public ObservableCollection<AccountRow> Accounts { get; } = new();
     public ObservableCollection<KeyValueRow> Drives { get; } = new();
     public ObservableCollection<SetupStep> Setup { get; } = new();
     public ObservableCollection<KeyValueRow> Warnings { get; } = new();
@@ -25,42 +25,44 @@ public sealed partial class DashboardViewModel : PageViewModel
     [ObservableProperty] private string _cacheDetail = "";
     [ObservableProperty] private double _cacheFraction;
     [ObservableProperty] private string _freeSpace = Fmt.NA;
+    [ObservableProperty] private string _cloudStorage = "";
     [ObservableProperty] private string _engineState = "Idle";
     [ObservableProperty] private string _engineDetail = "";
     [ObservableProperty] private string _hitRate = Fmt.NA;
     [ObservableProperty] private string _gameState = "No game running";
-    [ObservableProperty] private string _health = "No drives mounted";
+    [ObservableProperty] private string _health = "No drives connected";
     [ObservableProperty] private string _healthTone = "muted";
     [ObservableProperty] private double?[] _rateHistory = [];
     [ObservableProperty] private bool _setupComplete;
 
-    public override void OnShown() => OnStateChanged();
+    public override void OnShown()
+    {
+        OnStateChanged();
+        // Storage figures come live from the provider; refresh them when the page opens (at most once a minute).
+        if (Host.Remotes.Count > 0 && DateTime.UtcNow - Host.AccountsRefreshedAt > TimeSpan.FromMinutes(1)) _ = Host.RefreshAccountsAsync();
+    }
 
     public override void OnStateChanged()
     {
-        Accounts.ReplaceWith(Host.Remotes.Select(r =>
-        {
-            var p = Providers.ProviderRegistry.ForBackend(r.Type);
-            return new KeyValueRow(r.Name, $"{p?.DisplayName ?? r.Type} · {(p?.Support ?? Providers.SupportLevel.AvailableUntested) switch
-            {
-                Providers.SupportLevel.Supported => "supported",
-                Providers.SupportLevel.AvailableUntested => "via rclone (untested)",
-                _ => "unsupported"
-            }}", "accent");
-        }));
+        // Real identity and storage of each account, asked from the provider — not the internal remote names.
+        Accounts.ReplaceWith(AccountText.Rows(Host));
+        CloudStorage = Host.Remotes.Count == 0 ? "No cloud account connected"
+            : AccountText.Totals(Host) is { } t ? $"Cloud: {ByteSize.Format(t.Used)} used of {ByteSize.Format(t.Total)} · {t.Accounts} account(s)"
+            : Host.AccountsRefreshedAt == default ? "Cloud: checking accounts…" : "Cloud: " + Fmt.NA;
         var sessions = Host.Mounts.Sessions;
         Drives.ReplaceWith(Host.Settings.Mounts.Select(d =>
         {
             var s = sessions.FirstOrDefault(x => x.Id == d.Id);
             var state = s?.State ?? MountState.Stopped;
             return new KeyValueRow($"{(s != null ? s.DriveLetter + ":" : (d.DriveLetter ?? "?") + ":")}  {d.DisplayName}",
-                $"{state} · {d.RemoteSpec}{(s?.Message is { } m && state != MountState.Mounted ? " · " + m : "")}", Fmt.Tone(state));
+                $"{state} · {Host.AccountLabel(d.RemoteName)}{(AccountText.Storage(Host.Accounts.GetValueOrDefault(d.RemoteName)) is { } st ? " · " + st : "")}" +
+                $"{(s?.Message is { } m && state != MountState.Mounted ? " · " + m : "")}", Fmt.Tone(state));
         }));
         var mounted = sessions.Count(s => s.State == MountState.Mounted);
         var degraded = sessions.Count(s => s.State is MountState.Degraded or MountState.Failed);
         (Health, HealthTone) = degraded > 0 ? ($"{degraded} drive(s) need attention", "error")
-            : mounted > 0 ? ($"{mounted} drive(s) mounted and healthy", "ok")
-            : ("No drives mounted", "muted");
+            : mounted > 0 ? ($"{mounted} drive(s) connected and active", "ok")
+            : ("No drives connected", "muted");
 
         var deps = Host.Dependencies;
         Warnings.ReplaceWith(deps.Where(d => d.State != DependencyState.Ok).Select(d => new KeyValueRow(d.Name, d.Detail + (d.Remedy != null ? " " + d.Remedy : ""),
@@ -70,7 +72,7 @@ public sealed partial class DashboardViewModel : PageViewModel
             new("WinFsp installed", deps.Any(d => d.Name == "WinFsp" && d.State == DependencyState.Ok), "Required for the virtual drive"),
             new("rclone available", Host.Rclone != null, "Bundled with Cloud Drive"),
             new("Cloud account connected", Host.Remotes.Count > 0, "Cloud Drives → Connect Google Drive"),
-            new("Drive mounted", mounted > 0, "Cloud Drives → Add drive"),
+            new("Drive connected", mounted > 0, "Cloud Drives → Add drive"),
             new("Game added", games.Count > 0, "Game Library → Add game"),
         ]);
         SetupComplete = Setup.All(s => s.Done);

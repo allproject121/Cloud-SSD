@@ -11,6 +11,7 @@
         <DataTemplate DataType="{x:Type vm:CloudDrivesViewModel}"><v:CloudDrivesView /></DataTemplate>
         <DataTemplate DataType="{x:Type vm:GameLibraryViewModel}"><v:GameLibraryView /></DataTemplate>
         <DataTemplate DataType="{x:Type vm:MobileHubViewModel}"><v:MobileHubView /></DataTemplate>
+        <DataTemplate DataType="{x:Type vm:MemoryViewModel}"><v:MemoryView /></DataTemplate>
         <DataTemplate DataType="{x:Type vm:AcceleratorViewModel}"><v:AcceleratorView /></DataTemplate>
         <DataTemplate DataType="{x:Type vm:SmartCacheViewModel}"><v:SmartCacheView /></DataTemplate>
         <DataTemplate DataType="{x:Type vm:PerformanceViewModel}"><v:PerformanceView /></DataTemplate>
@@ -36,9 +37,9 @@
                     </Border>
                     <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
                         <TextBlock FontSize="16" FontWeight="Bold">
-                            <Run Text="CLOUD " /><Run Text="DRIVE" Foreground="{StaticResource Purple}" />
+                            <Run Text="CLOUD-" /><Run Text="SSD" Foreground="{StaticResource Purple}" />
                         </TextBlock>
-                        <TextBlock Text="Cloud Virtual Drive Engine" FontSize="10.5" Foreground="{StaticResource Dim}" />
+                        <TextBlock Text="{Binding StorageSummary}" FontSize="10.5" Foreground="{StaticResource Dim}" TextTrimming="CharacterEllipsis" MaxWidth="170" />
                     </StackPanel>
                 </StackPanel>
                 <StackPanel DockPanel.Dock="Bottom" Margin="18,0,18,14">

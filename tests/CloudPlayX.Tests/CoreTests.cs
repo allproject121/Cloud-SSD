@@ -232,7 +232,9 @@ public class MountPlanningTests
             "vfs-cache-mode", "cache-dir", "vfs-cache-max-size", "vfs-cache-min-free-space", "vfs-cache-max-age", "vfs-cache-poll-interval",
             "buffer-size", "vfs-read-ahead", "vfs-read-chunk-size", "vfs-read-chunk-streams", "vfs-write-back", "dir-cache-time", "file-perms",
             "dir-perms", "volname", "read-only", "bwlimit", "tpslimit", "rc", "rc-addr", "log-file", "log-format", "log-file-max-size",
-            "log-file-max-backups", "http-url", "attr-timeout", "poll-interval", "vfs-fast-fingerprint", "vfs-handle-caching", "vfs-read-chunk-size-limit"
+            "log-file-max-backups", "http-url", "attr-timeout", "poll-interval", "vfs-fast-fingerprint", "vfs-handle-caching", "vfs-read-chunk-size-limit",
+            "vfs-disk-space-total-size", "vfs-refresh", "no-checksum", "filter", "drive-pacer-min-sleep", "drive-pacer-burst",
+            "drive-acknowledge-abuse", "drive-encoding"
         }.Except(missing).ToHashSet();
         return new RcloneInfo("rclone.exe", "rclone v1.75.2", new Version(1, 75, 2), flags);
     }
@@ -249,7 +251,8 @@ public class MountPlanningTests
         Assert.StartsWith("mount gdrive:Games X:", a);
         Assert.Contains("--vfs-cache-mode full", a);
         Assert.Contains("--vfs-cache-max-size 20Gi", a);
-        Assert.Contains("--buffer-size 0", a);
+        Assert.Contains("--buffer-size 0", a); // 0 is the deliberate default (no speculative download past each read)
+        Assert.Contains("--vfs-read-ahead 0", a);
         Assert.Contains("--file-perms 0777", a);
         Assert.Contains("--rc-addr 127.0.0.1:5572", a);
         Assert.Contains("--tpslimit 10", a);
@@ -257,6 +260,21 @@ public class MountPlanningTests
         Assert.DoesNotContain("rc-pass", a);
         Assert.DoesNotContain("rc-user", a);
         Assert.Empty(plan.Warnings);
+    }
+
+    [Fact]
+    public void Tps_limit_is_drive_only_zero_is_unlimited_and_handle_caching_matches_unmount_wait()
+    {
+        static string Args(MountPlanInput i) => string.Join(' ', MountFlagBuilder.Build(i, FakeRclone()).Arguments);
+        // A global --tpslimit on non-Drive remotes let the startup directory walk starve data reads (~20 % of link).
+        Assert.DoesNotContain("--tpslimit", Args(Input() with { RemoteType = "http" }));
+        // ...but a union of Drive accounts (the real Z: drive) still hits Drive's API quota.
+        Assert.Contains("--tpslimit 10", Args(Input() with { RemoteType = "union" }));
+        Assert.DoesNotContain("--tpslimit", Args(Input() with { Network = new NetworkSettings { TpsLimit = 0 } }));
+        // RcloneMountService.HandleCachingWindow (6 s) assumes rclone's handle cache closes within 5 s.
+        Assert.Contains("--vfs-handle-caching 5s", Args(Input()));
+        // File Explorer must show the account's real size, not a fixed 15 TB.
+        Assert.DoesNotContain("--vfs-disk-space-total-size", Args(Input()));
     }
 
     [Fact]

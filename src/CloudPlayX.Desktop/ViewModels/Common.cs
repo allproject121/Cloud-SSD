@@ -100,6 +100,46 @@ public abstract partial class PageViewModel : ObservableObject
 
 public sealed record KeyValueRow(string Key, string Value, string Tone = "muted");
 
+/// <summary>A connected account as shown to the user: its real Gmail address (Title) instead of the internal remote name.</summary>
+public sealed record AccountRow(string Remote, string Title, string Detail, string Tone = "");
+
+public static class AccountText
+{
+    /// <summary>Rows for every connected account and combined drive, with live storage figures where the provider gave them.</summary>
+    public static IEnumerable<AccountRow> Rows(AppHost host)
+    {
+        var shared = host.SharedClientRemotes;
+        // Only real sign-ins, each once: the generated remotes behind the two standard drives are not accounts.
+        foreach (var r in host.Remotes.Where(r => !AppHost.IsGeneratedType(r.Type) && r.Type != ""))
+        {
+            var info = host.Accounts.GetValueOrDefault(r.Name);
+            var provider = Providers.ProviderRegistry.ForBackend(r.Type)?.DisplayName ?? r.Type;
+            var title = host.AccountName(r.Name);
+            var detail = Join(provider, info?.DisplayName, Storage(info),
+                info is { Reachable: false } ? "sign-in not working — connect it again" : null,
+                info is null ? "checking…" : null,
+                shared.Contains(r.Name) ? "shared rclone login (retiring)" : null);
+            yield return new AccountRow(r.Name, title, detail, info is { Reachable: false } ? "error" : shared.Contains(r.Name) ? "warn" : "");
+        }
+    }
+
+    public static string? Storage(Mount.CloudAccountInfo? a) =>
+        a?.UsedBytes is { } u && a.TotalBytes is { } t ? $"{ByteSize.Format(u)} used of {ByteSize.Format(t)}"
+        : a?.UsedBytes is { } u2 ? $"{ByteSize.Format(u2)} used"
+        : null;
+
+    /// <summary>Real storage over all distinct accounts (the same Gmail connected twice, or a combined drive, is counted once).</summary>
+    public static (long Used, long Total, int Accounts)? Totals(AppHost host)
+    {
+        var distinct = host.Remotes.Where(r => !AppHost.IsGeneratedType(r.Type))
+            .Select(r => host.Accounts.GetValueOrDefault(r.Name)).Where(a => a is { TotalBytes: not null })
+            .GroupBy(a => a!.Email ?? a.Remote, StringComparer.OrdinalIgnoreCase).Select(g => g.First()!).ToList();
+        return distinct.Count == 0 ? null : (distinct.Sum(a => a.UsedBytes ?? 0), distinct.Sum(a => a.TotalBytes ?? 0), distinct.Count);
+    }
+
+    private static string Join(params string?[] parts) => string.Join(" · ", parts.Where(p => !string.IsNullOrEmpty(p)));
+}
+
 public static class CollectionExtensions
 {
     public static void ReplaceWith<T>(this ObservableCollection<T> c, IEnumerable<T> items)

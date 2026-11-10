@@ -10,6 +10,8 @@ public sealed class AppSettings
     public NetworkSettings Network { get; set; } = new();
     public StreamingSettings Streaming { get; set; } = new();
     public List<MountDefinition> Mounts { get; set; } = new();
+    /// <summary>Last known sign-in address of each account (remote name → e-mail), so names stay stable while offline.</summary>
+    public Dictionary<string, string> AccountEmails { get; set; } = new();
     public string? RclonePathOverride { get; set; }
     public bool RestoreMountsOnStartup { get; set; } = true;
     public bool KeepMountsAfterExit { get; set; } = false;
@@ -129,7 +131,14 @@ public sealed class MobileBridgeSettings
 {
     public bool Enabled { get; set; } = true;
     public int Port { get; set; } = 8090;
-    public string PairingToken { get; set; } = Guid.NewGuid().ToString("N")[..12];
+    public string PairingToken { get; set; } = NewPairingToken();
+
+    /// <summary>Tokens shorter than this (the 12-character ones from v0.7.0) are replaced on start; phones re-pair by QR.</summary>
+    public const int MinPairingTokenLength = 32;
+
+    /// <summary>128 random bits as 32 lowercase hex characters.</summary>
+    public static string NewPairingToken() =>
+        Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16)).ToLowerInvariant();
     public string? UploadDirectory { get; set; }
     public string? PhotoBackupDirectory { get; set; }
     public bool AllowDriveBrowsing { get; set; } = true;

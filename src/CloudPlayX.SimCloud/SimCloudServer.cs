@@ -209,7 +209,9 @@ public sealed class SimCloudServer : IAsyncDisposable
         if (partial) Interlocked.Increment(ref _rangeRequests);
         ServedRanges.Enqueue((rel.Replace('\\', '/'), start, length));
 
-        var dropAt = DropRate > 0 && NextDouble() < DropRate ? (long)(length * NextDouble()) : -1;
+        // Cut within the first 256 KiB: rclone asks for multi-MiB ranges but small random reads consume only the start
+        // of each before closing, so a cut point anywhere in the range was almost never reached (flaky retry test).
+        var dropAt = DropRate > 0 && NextDouble() < DropRate ? (long)(Math.Min(length, 256 * 1024) * NextDouble()) : -1;
         await using var fs = new FileStream(full, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 1, FileOptions.RandomAccess);
         fs.Seek(start, SeekOrigin.Begin);
         var buffer = new byte[16 * 1024];

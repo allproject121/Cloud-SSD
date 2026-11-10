@@ -44,7 +44,7 @@ public sealed partial class SmartCacheViewModel : PageViewModel
     [ObservableProperty] private bool _isUnderThreshold;
     [ObservableProperty] private string _offloadStatusText = "Monitoring Active";
     [ObservableProperty] private string _offloadStatusTone = "ok";
-    [ObservableProperty] private string _targetDriveDisplayName = "Cloud-SSD (15TB) (Z:)";
+    [ObservableProperty] private string _targetDriveDisplayName = "No cloud drive connected";
     [ObservableProperty] private string _lastOffloadFormatted = "Never";
     [ObservableProperty] private string _totalOffloadedFormatted = "0 B";
     [ObservableProperty] private string _uploadsPendingSummary = "0 files (0 B)";
@@ -252,7 +252,41 @@ public sealed partial class SmartCacheViewModel : PageViewModel
 /// <summary>Settings: network, prediction, startup, rclone and advanced VFS tuning.</summary>
 public sealed partial class SettingsViewModel : PageViewModel
 {
-    public SettingsViewModel(AppHost host) : base(host, "Settings", "") { }
+    public SmartCacheViewModel Storage { get; }
+    public AcceleratorViewModel Accelerator { get; }
+    public PerformanceViewModel Performance { get; }
+    public DiagnosticsViewModel Diagnostics { get; }
+
+    [ObservableProperty] private string _activeTab = "General";
+    [ObservableProperty] private object? _currentContent;
+
+    public SettingsViewModel(AppHost host) : base(host, "Settings", "")
+    {
+        Storage = new SmartCacheViewModel(host);
+        Accelerator = new AcceleratorViewModel(host);
+        Performance = new PerformanceViewModel(host);
+        Diagnostics = new DiagnosticsViewModel(host);
+        ActiveTab = "General";
+    }
+
+    [RelayCommand]
+    public void SwitchSubTab(string tab)
+    {
+        ActiveTab = tab;
+        CurrentContent = tab switch
+        {
+            "Storage" => Storage,
+            "Speed" => Accelerator,
+            "Performance" => Performance,
+            "Advanced" => Diagnostics,
+            _ => null
+        };
+
+        if (tab == "Storage") Storage.OnShown();
+        else if (tab == "Speed") Accelerator.OnShown();
+        else if (tab == "Performance") Performance.OnShown();
+        else if (tab == "Advanced") Diagnostics.OnShown();
+    }
 
     [ObservableProperty] private string _declaredMbps = "70";
     [ObservableProperty] private string _measured = "";
@@ -304,6 +338,26 @@ public sealed partial class SettingsViewModel : PageViewModel
         ChunkStreams = s.Cache.ReadChunkStreams.ToString();
         WriteBackSeconds = s.Cache.WriteBack.TotalSeconds.ToString("0");
         DataRoot = Host.Paths.DataRoot;
+        Storage.OnShown();
+        Accelerator.OnShown();
+        Performance.OnShown();
+        Diagnostics.OnShown();
+    }
+
+    public override void OnStateChanged()
+    {
+        Storage.OnStateChanged();
+        Accelerator.OnStateChanged();
+        Performance.OnStateChanged();
+        Diagnostics.OnStateChanged();
+    }
+
+    public override void OnMetrics(EngineMetrics m)
+    {
+        Storage.OnMetrics(m);
+        Accelerator.OnMetrics(m);
+        Performance.OnMetrics(m);
+        Diagnostics.OnMetrics(m);
     }
 
     [RelayCommand]
@@ -411,6 +465,9 @@ public sealed partial class DiagnosticsViewModel : PageViewModel
             if (s.NetworkErrors > 0) list.Add(new("Network errors", $"{s.Definition.DisplayName}: {s.NetworkErrors} network errors (last {s.LastNetworkError:T}). Uncached reads fail while offline; cached data stays readable.", "warn"));
             if (s.State is MountState.Failed or MountState.Degraded) list.Add(new("Drive problem", $"{s.Definition.DisplayName}: {s.Message}", "error"));
         }
+        if (Host.SharedClientRemotes.Count > 0)
+            list.Add(new("Google login is being retired", $"{string.Join(", ", Host.SharedClientRemotes)} still use rclone's shared Google login, which rclone retires during 2026. " +
+                                                          "Cloud Drives → Switch to my own Google key.", "warn"));
         if (Host.DiskPressure) list.Add(new("Low disk space", "Prefetching is paused and rclone is evicting cached data. Free space or move the cache (Smart Cache).", "warn"));
         if (Host.Dependencies.Any(d => d.Name == "WinFsp" && d.State != DependencyState.Ok)) list.Add(new("Install WinFsp", "Without WinFsp no virtual drive can be created.", "error"));
         if (list.Count == 0) list.Add(new("No problems detected", "Everything Cloud Drive can check looks healthy.", "ok"));

@@ -58,6 +58,9 @@ public sealed partial class RcloneLogParser
     /// <summary>rclone checked its cache for an in-flight read: (path, offset, present, isPrefetch). Arrives before the data.</summary>
     public event Action<string, long, bool, bool>? Lookup;
     public event Action<ProviderEvent>? Provider;
+    /// <summary>A folder of the drive was opened for listing; the path is relative to the drive root ("" = root).</summary>
+    public event Action<string>? DirectoryListed;
+    private const string OpendirSuffix = ": Opendir: ";
 
     public long LinesParsed { get; private set; }
 
@@ -71,6 +74,12 @@ public sealed partial class RcloneLogParser
 
         if (lvl == "DEBUG")
         {
+            // "/Games/Demo: Opendir: " — a program (File Explorer) started listing that folder.
+            if (msg.EndsWith(OpendirSuffix, StringComparison.Ordinal) && msg.StartsWith('/'))
+            {
+                DirectoryListed?.Invoke(msg[..^OpendirSuffix.Length].Trim('/'));
+                return;
+            }
             if (msg.Contains("_readAt: ", StringComparison.Ordinal))
             {
                 if (msg.Contains(">_readAt", StringComparison.Ordinal)) OnReadEnd(m, msg);
@@ -104,7 +113,9 @@ public sealed partial class RcloneLogParser
     public static ProviderEventKind Classify(string msg, ProviderEventKind fallback)
     {
         if (msg.Contains("rateLimitExceeded", StringComparison.OrdinalIgnoreCase) || msg.Contains("Rate Limit Exceeded", StringComparison.OrdinalIgnoreCase)
-            || msg.Contains("429", StringComparison.Ordinal) || msg.Contains("Rate exceeded", StringComparison.OrdinalIgnoreCase))
+            || msg.Contains("429", StringComparison.Ordinal) || msg.Contains("Rate exceeded", StringComparison.OrdinalIgnoreCase)
+            // Google's wording when a client's shared per-minute quota is used up (rclone's retiring shared login).
+            || msg.Contains("Quota exceeded", StringComparison.OrdinalIgnoreCase))
             return ProviderEventKind.RateLimited;
         if (msg.Contains("invalid_grant", StringComparison.OrdinalIgnoreCase) || msg.Contains("oauth2", StringComparison.OrdinalIgnoreCase)
             || msg.Contains("401", StringComparison.Ordinal) || msg.Contains("token", StringComparison.OrdinalIgnoreCase) && msg.Contains("expired", StringComparison.OrdinalIgnoreCase))

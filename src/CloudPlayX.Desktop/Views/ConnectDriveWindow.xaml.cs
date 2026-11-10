@@ -66,12 +66,12 @@ public partial class ConnectDriveWindow : Window
         }
         else if (_bundled != null)
         {
-            ModeText.Text = "Uses the Cloud Drive Google sign-in that came with this installation. Optional: your own key below.";
+            ModeText.Text = "Your browser opens Google's sign-in page. Choose your Gmail and press Allow.";
         }
         else
         {
-            ModeText.Text = "Uses rclone's built-in shared Google login (Google's page says “rclone”). It is shared by all rclone users, so Google may " +
-                            "slow it down (“rate limited”), and rclone is retiring it during 2026. Your own key below avoids that.";
+            ModeText.Text = "Your browser opens Google's sign-in page. Choose your Gmail and press Allow. " +
+                            "Google's page shows the name “rclone” — that is the engine Cloud-SSD uses, it is expected.";
         }
     }
 

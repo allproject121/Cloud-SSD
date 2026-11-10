@@ -46,6 +46,7 @@ public sealed partial class MobileHubViewModel : PageViewModel
     [ObservableProperty] private string _localUrl = "http://127.0.0.1:8090/";
     [ObservableProperty] private string _pairingUrl = "";
     [ObservableProperty] private string _pairingToken = "";
+    [ObservableProperty] private string _pairingCode = "";
     [ObservableProperty] private BitmapSource? _qrCode;
     [ObservableProperty] private string _transferRateFormatted = "0.0 MB/s";
     [ObservableProperty] private string _uploadDirectory;
@@ -89,6 +90,8 @@ public sealed partial class MobileHubViewModel : PageViewModel
         LocalUrl = Host.MobileBridge.LocalUrl;
         PairingToken = Host.MobileBridge.PairingToken;
         PairingUrl = $"{LocalUrl}?token={PairingToken}";
+        var code = Host.MobileBridge.PairingCode;
+        PairingCode = $"{code[..3]} {code[3..]}"; // "123 456" is easier to read off the screen
 
         try
         {
@@ -129,7 +132,7 @@ public sealed partial class MobileHubViewModel : PageViewModel
     [RelayCommand]
     private void RegenerateToken()
     {
-        Host.Settings.MobileBridge.PairingToken = Guid.NewGuid().ToString("N")[..12];
+        Host.Settings.MobileBridge.PairingToken = MobileBridgeSettings.NewPairingToken();
         Host.SaveSettings();
         RefreshState();
         Say("New pairing token generated. Existing phones must rescan QR code.", "ok");

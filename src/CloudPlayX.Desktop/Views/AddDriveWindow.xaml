@@ -28,10 +28,10 @@
             </StackPanel>
         </Grid>
         <CheckBox x:Name="ReadOnlyBox" Content="Read-only (protects cloud originals; games that write into their folder need Hybrid mode)" Margin="0,14,0,0" />
-        <CheckBox x:Name="AutoBox" Content="Mount automatically when Cloud Drive starts" IsChecked="True" />
+        <CheckBox x:Name="AutoBox" Content="Connect automatically on startup" IsChecked="True" />
         <TextBlock x:Name="Status" Style="{StaticResource Caption}" Foreground="{StaticResource Danger}" Margin="0,10,0,0" />
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0">
-            <Button Style="{StaticResource Primary}" Content="Add and mount" Click="Ok" />
+            <Button Style="{StaticResource Primary}" Content="Add and connect" Click="Ok" />
             <Button Content="Cancel" IsCancel="True" Margin="0" />
         </StackPanel>
     </StackPanel>

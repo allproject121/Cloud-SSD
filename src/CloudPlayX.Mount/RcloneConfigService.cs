@@ -11,6 +11,12 @@ public sealed record RemoteEntry(string Name, string Type);
 public sealed record RemoteItem(string Name, string Path, bool IsDir, long Size, DateTimeOffset? ModTime, string? MimeType);
 
 /// <summary>
+/// Who a connected account really is and how much storage it has, asked live from the provider. Null means the
+/// provider did not report it (or the login does not work right now) — never a made-up value.
+/// </summary>
+public sealed record CloudAccountInfo(string Remote, string? Email, string? DisplayName, long? UsedBytes, long? TotalBytes, long? FreeBytes, bool Reachable);
+
+/// <summary>
 /// Owns CLOUDPLAY X's private rclone config file (%LOCALAPPDATA%\CloudPlayX\rclone.conf). When encryption is enabled
 /// the file is encrypted by rclone itself with a random password that is stored DPAPI-protected and handed to rclone
 /// only through the RCLONE_CONFIG_PASS environment variable.
@@ -78,6 +84,116 @@ public sealed class RcloneConfigService
             DateTimeOffset.TryParse(n["ModTime"]?.GetValue<string>(), out var mt) ? mt : null,
             n["MimeType"]?.GetValue<string>())).ToList();
     }
+
+    /// <summary>The whole config as JSON ("rclone config dump"). It holds logins: keep it in memory, never log it.</summary>
+    public async Task<JsonObject> DumpAsync(RcloneInfo rclone, CancellationToken ct = default)
+    {
+        if (!File.Exists(ConfigPath)) return new JsonObject();
+        var r = await CreateRunner(rclone).RunAsync(["config", "dump"], TimeSpan.FromSeconds(30), ct);
+        if (!r.Success) throw new InvalidOperationException("rclone config dump failed: " + Redactor.Redact(r.StdErr.Trim()));
+        return JsonNode.Parse(r.StdOut) as JsonObject ?? new JsonObject();
+    }
+
+    /// <summary>Google Drive remotes signed in through rclone's shared OAuth client, which rclone retires during 2026.</summary>
+    public static IReadOnlyList<string> SharedClientDriveRemotes(JsonObject dump) =>
+        dump.Where(kv => kv.Value is JsonObject o && Str(o, "type") == "drive" && Str(o, "client_id") == ""
+                         && Str(o, "service_account_file") == "" && Str(o, "service_account_credentials") == "")
+            .Select(kv => kv.Key).ToList();
+
+    /// <summary>The remote plus every remote (union, combine, alias, crypt, …) that reads through it, directly or indirectly.</summary>
+    public static IReadOnlySet<string> RemotesUsing(JsonObject dump, string remote)
+    {
+        var result = new HashSet<string>(StringComparer.Ordinal) { remote };
+        for (var grew = true; grew;)
+        {
+            grew = false;
+            foreach (var (name, node) in dump)
+            {
+                if (result.Contains(name) || node is not JsonObject o) continue;
+                var targets = (Str(o, "upstreams") + " " + Str(o, "remote")).Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(u => u.Contains('=') ? u[(u.IndexOf('=') + 1)..] : u); // combine: "dir=remote:path"
+                if (targets.Any(t => result.Any(r => t.StartsWith(r + ":", StringComparison.Ordinal))))
+                {
+                    result.Add(name);
+                    grew = true;
+                }
+            }
+        }
+        return result;
+    }
+
+    /// <summary>Union remotes (several accounts shown as one drive) with their upstream list.</summary>
+    public static IReadOnlyList<(string Name, string Upstreams)> Unions(JsonObject dump) =>
+        dump.Where(kv => kv.Value is JsonObject o && Str(o, "type") == "union")
+            .Select(kv => (kv.Key, Str((JsonObject)kv.Value!, "upstreams"))).ToList();
+
+    /// <summary>
+    /// Remote names in a union's or combine's upstream list ("Drive1: Drive2:/games Drive3::ro" → Drive1, Drive2,
+    /// Drive3; combine entries are "folder=remote:").
+    /// </summary>
+    public static IReadOnlyList<string> UpstreamRemotes(string upstreams) =>
+        upstreams.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Select(u => u.Contains('=') ? u[(u.IndexOf('=') + 1)..] : u)
+            .Where(u => u.IndexOf(':') > 0).Select(u => u[..u.IndexOf(':')]).ToList();
+
+    /// <summary>Combine remotes (one drive with a folder per account) with their upstream list.</summary>
+    public static IReadOnlyList<(string Name, string Upstreams)> Combines(JsonObject dump) =>
+        dump.Where(kv => kv.Value is JsonObject o && Str(o, "type") == "combine")
+            .Select(kv => (kv.Key, Str((JsonObject)kv.Value!, "upstreams"))).ToList();
+
+    /// <summary>Google Drive accounts signed in read-only: they can be shown but never receive files.</summary>
+    public static IReadOnlyList<string> ReadOnlyDriveRemotes(JsonObject dump) =>
+        dump.Where(kv => kv.Value is JsonObject o && Str(o, "type") == "drive" && Str(o, "scope") == "drive.readonly")
+            .Select(kv => kv.Key).ToList();
+
+    /// <summary>
+    /// Writes a generated remote (the union or combine behind a standard drive) with exactly these options, replacing
+    /// any earlier remote of that name so no stale option survives.
+    /// </summary>
+    public async Task WriteRemoteAsync(RcloneInfo rclone, string name, string type, IEnumerable<(string Key, string Value)> options, CancellationToken ct = default)
+    {
+        await CreateRunner(rclone).RunAsync(["config", "delete", name], TimeSpan.FromSeconds(30), ct);
+        var args = new List<string> { "config", "create", name, type };
+        foreach (var (k, v) in options) { args.Add(k); args.Add(v); }
+        args.Add("--non-interactive");
+        var r = await CreateRunner(rclone).RunAsync(args, TimeSpan.FromSeconds(30), ct);
+        if (!r.Success) throw new InvalidOperationException(ExplainError(r.StdErr));
+    }
+
+    /// <summary>Google Drive accounts that may be written to (not signed in read-only), i.e. usable in a combined drive.</summary>
+    public static IReadOnlyList<string> WritableDriveRemotes(JsonObject dump) =>
+        dump.Where(kv => kv.Value is JsonObject o && Str(o, "type") == "drive" && Str(o, "scope") != "drive.readonly")
+            .Select(kv => kv.Key).ToList();
+
+    /// <summary>
+    /// Adds a remote to a union so its free space joins that drive (the union's "mfs" create policy then writes new
+    /// files to whichever account has the most free space). Existing files stay where they are.
+    /// </summary>
+    public Task AddUnionUpstreamAsync(RcloneInfo rclone, string union, string currentUpstreams, string remote, CancellationToken ct = default) =>
+        SetUnionUpstreamsAsync(rclone, union, UpstreamRemotes(currentUpstreams).Append(remote), ct);
+
+    /// <summary>Replaces a union's account list. Files stay in their own accounts; only what the drive shows changes.</summary>
+    public async Task SetUnionUpstreamsAsync(RcloneInfo rclone, string union, IEnumerable<string> remotes, CancellationToken ct = default)
+    {
+        var upstreams = string.Join(' ', remotes.Distinct().Select(r => r + ":"));
+        var r = await CreateRunner(rclone).RunAsync(["config", "update", union, "upstreams", upstreams, "--non-interactive"], TimeSpan.FromSeconds(30), ct);
+        if (!r.Success) throw new InvalidOperationException(ExplainError(r.StdErr));
+    }
+
+    /// <summary>
+    /// Creates a union: several accounts shown as one drive. New files go to the account with the most free space
+    /// ("mfs"); changes and deletes act where the file already is ("epmfs").
+    /// </summary>
+    public async Task CreateUnionAsync(RcloneInfo rclone, string name, IEnumerable<string> remotes, CancellationToken ct = default)
+    {
+        var upstreams = string.Join(' ', remotes.Distinct().Select(r => r + ":"));
+        var r = await CreateRunner(rclone).RunAsync(
+            ["config", "create", name, "union", "upstreams", upstreams, "action_policy", "epmfs", "create_policy", "mfs", "search_policy", "ff", "--non-interactive"],
+            TimeSpan.FromSeconds(30), ct);
+        if (!r.Success) throw new InvalidOperationException(ExplainError(r.StdErr));
+    }
+
+    private static string Str(JsonObject o, string key) => o[key] is JsonValue v && v.TryGetValue<string>(out var s) ? s.Trim() : "";
 
     public async Task DeleteRemoteAsync(RcloneInfo rclone, string name, CancellationToken ct = default)
     {
@@ -161,92 +277,259 @@ public sealed class GoogleDriveConnector
 
     public async Task ConnectAsync(RcloneInfo rclone, Request req, IProgress<string>? progress, CancellationToken ct)
     {
-        if (!req.UsesSharedClient)
-        {
-            if (string.IsNullOrWhiteSpace(req.ClientId) || !req.ClientId.Trim().EndsWith(".apps.googleusercontent.com", StringComparison.OrdinalIgnoreCase))
-                throw new ArgumentException("The client ID must be a Google OAuth client ID ending in .apps.googleusercontent.com.");
-            if (string.IsNullOrWhiteSpace(req.ClientSecret)) throw new ArgumentException("The client secret is required.");
-        }
+        if (!req.UsesSharedClient) ValidateClient(req.ClientId, req.ClientSecret);
         if (!System.Text.RegularExpressions.Regex.IsMatch(req.RemoteName, "^[A-Za-z0-9_\\-]{1,40}$"))
             throw new ArgumentException("Account name may only contain letters, digits, '-' and '_'.");
 
+        await using var daemon = await StartDaemonAsync(rclone, ct);
+        var rc = daemon.Rc;
+
+        var parameters = new Dictionary<string, string> { ["scope"] = req.ReadOnlyScope ? "drive.readonly" : "drive" };
+        if (!req.UsesSharedClient)
+        {
+            parameters["client_id"] = req.ClientId.Trim();
+            parameters["client_secret"] = req.ClientSecret.Trim();
+        }
+        if (!string.IsNullOrWhiteSpace(req.RootFolderId)) parameters["root_folder_id"] = req.RootFolderId.Trim();
+
+        progress?.Report("Saving OAuth client configuration…");
+        var node = await rc.CallAsync("config/create", new
+        {
+            name = req.RemoteName,
+            type = "drive",
+            parameters,
+            opt = new { nonInteractive = true, obscure = false }
+        }, ct);
+        await AnswerQuestionsAsync(rc, req.RemoteName, node, new()
+        {
+            // rclone >= 1.75 warns that its shared client is being retired; the user chose it explicitly.
+            ["config_shared_client_id"] = req.UsesSharedClient ? "true" : "false",
+        }, progress, ct);
+
+        // Verify the token works with a cheap metadata call.
+        progress?.Report("Verifying access to Google Drive…");
+        try
+        {
+            var about = await rc.CallAsync("operations/about", new { fs = req.RemoteName + ":" }, ct, TimeSpan.FromMinutes(1));
+            _log.LogInformation("Google Drive connected: quota total={Total} used={Used}", about["total"]?.ToString(), about["used"]?.ToString());
+        }
+        catch (RcException e)
+        {
+            // Do not leave a half-working login behind.
+            try { await rc.CallAsync("config/delete", new { name = req.RemoteName }, CancellationToken.None, TimeSpan.FromSeconds(10)); } catch (Exception) { }
+            throw GoogleSetupException.From(e.Message) ?? (Exception)e;
+        }
+    }
+
+    /// <summary>The Google account (Gmail address) a remote is signed in as, or null when its login does not work right now.</summary>
+    public async Task<string?> AccountEmailAsync(RcloneInfo rclone, string remote, CancellationToken ct)
+    {
+        await using var daemon = await StartDaemonAsync(rclone, ct);
+        return await AccountEmailAsync(daemon.Rc, remote, ct);
+    }
+
+    /// <summary>
+    /// Moves an existing Google Drive login to the user's own OAuth client: saves the new client and signs in again in
+    /// the browser. When <paramref name="expectedEmail"/> is known, the new sign-in must be that same Google account,
+    /// otherwise the previous login is put back — a union of several accounts must never end up pointing at the wrong
+    /// one. Unmount everything that uses the remote first: a running mount would write its old token back over the new one.
+    /// Returns the Google account the remote is now signed in as.
+    /// </summary>
+    public async Task<string?> RekeyAsync(RcloneInfo rclone, string remote, string clientId, string clientSecret, string? expectedEmail,
+        IProgress<string>? progress, CancellationToken ct)
+    {
+        ValidateClient(clientId, clientSecret);
+        Dictionary<string, string>? previous = null;
+        try
+        {
+            await using var daemon = await StartDaemonAsync(rclone, ct);
+            var rc = daemon.Rc;
+            var old = await rc.CallAsync("config/get", new { name = remote }, ct);
+            if (old["type"]?.GetValue<string>() != "drive") throw new InvalidOperationException($"'{remote}' is not a Google Drive account.");
+            previous = new[] { "client_id", "client_secret", "token" }.ToDictionary(k => k, k => old[k]?.GetValue<string>() ?? "");
+
+            progress?.Report($"{remote}: saving your Google key…");
+            var node = await rc.CallAsync("config/update", new
+            {
+                name = remote,
+                parameters = new Dictionary<string, string> { ["client_id"] = clientId.Trim(), ["client_secret"] = clientSecret.Trim() },
+                opt = new { nonInteractive = true, obscure = false }
+            }, ct);
+            await AnswerQuestionsAsync(rc, remote, node, new() { ["config_refresh_token"] = "true", ["config_shared_client_id"] = "false" }, progress, ct);
+
+            progress?.Report($"{remote}: checking which Google account you signed in with…");
+            try { await rc.CallAsync("operations/about", new { fs = remote + ":" }, ct, TimeSpan.FromMinutes(1)); }
+            catch (RcException e) { throw GoogleSetupException.From(e.Message) ?? (Exception)e; }
+            var email = await AccountEmailAsync(rc, remote, ct);
+            if (expectedEmail != null && !string.Equals(email, expectedEmail, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException($"You signed in as {email ?? "a different account"}, but '{remote}' belongs to {expectedEmail}. " +
+                                                    $"'{remote}' was left as it was; try again and choose {expectedEmail} on Google's page.");
+            _log.LogInformation("Google Drive {Remote} moved to the user's own OAuth client", remote);
+            return email;
+        }
+        catch (Exception e) when (previous != null)
+        {
+            // The daemon above is stopped by now (it may have been waiting for the browser redirect); restore with a fresh one.
+            _log.LogWarning("Re-keying {Remote} failed, restoring its previous login: {Error}", remote, Redactor.Redact(e.Message));
+            await RestoreAsync(rclone, remote, previous);
+            if (e is OperationCanceledException && !ct.IsCancellationRequested)
+                throw new TimeoutException($"{remote}: Google sign-in did not finish in time; '{remote}' was left as it was.");
+            throw;
+        }
+    }
+
+    private async Task RestoreAsync(RcloneInfo rclone, string remote, Dictionary<string, string> previous)
+    {
+        try
+        {
+            await using var daemon = await StartDaemonAsync(rclone, CancellationToken.None);
+            var node = await daemon.Rc.CallAsync("config/update", new
+            {
+                name = remote,
+                parameters = previous,
+                opt = new { nonInteractive = true, obscure = false }
+            }, CancellationToken.None);
+            await AnswerQuestionsAsync(daemon.Rc, remote, node, new()
+            {
+                ["config_refresh_token"] = "false",
+                ["config_shared_client_id"] = previous["client_id"] == "" ? "true" : "false",
+            }, null, CancellationToken.None, allowSignIn: false);
+        }
+        catch (Exception e)
+        {
+            _log.LogError("Could not restore the previous login of {Remote}: {Error}", remote, Redactor.Redact(e.Message));
+        }
+    }
+
+    private static readonly HttpClient GoogleApi = new() { Timeout = TimeSpan.FromSeconds(30) };
+
+    private static async Task<string?> AccountEmailAsync(RcClient rc, string remote, CancellationToken ct)
+    {
+        try
+        {
+            // A metadata call first, so rclone refreshes (and saves) the access token if it has expired.
+            await rc.CallAsync("operations/about", new { fs = remote + ":" }, ct, TimeSpan.FromMinutes(1));
+            return (await IdentityAsync(rc, remote, ct)).Email;
+        }
+        catch (Exception e) when (e is RcException or HttpRequestException or JsonException || (e is TaskCanceledException && !ct.IsCancellationRequested))
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Asks Google which account a Drive remote's current access token belongs to (Gmail address and name).</summary>
+    private static async Task<(string? Email, string? Name)> IdentityAsync(RcClient rc, string remote, CancellationToken ct)
+    {
+        var cfg = await rc.CallAsync("config/get", new { name = remote }, ct);
+        var token = JsonNode.Parse(cfg["token"]?.GetValue<string>() ?? "")?["access_token"]?.GetValue<string>();
+        if (string.IsNullOrEmpty(token)) return (null, null);
+        using var req = new HttpRequestMessage(HttpMethod.Get, "https://www.googleapis.com/drive/v3/about?fields=user(displayName,emailAddress)");
+        req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+        using var resp = await GoogleApi.SendAsync(req, ct);
+        if (!resp.IsSuccessStatusCode) return (null, null);
+        var user = JsonNode.Parse(await resp.Content.ReadAsStringAsync(ct))?["user"];
+        return (user?["emailAddress"]?.GetValue<string>(), user?["displayName"]?.GetValue<string>());
+    }
+
+    /// <summary>
+    /// Live identity and storage of every remote: quota through rclone ("about", which for a union is the sum of its
+    /// accounts) and, for Google Drive, the signed-in Gmail address and name straight from Google.
+    /// </summary>
+    public async Task<IReadOnlyList<CloudAccountInfo>> AccountInfoAsync(RcloneInfo rclone, IReadOnlyList<RemoteEntry> remotes, CancellationToken ct = default)
+    {
+        var list = new List<CloudAccountInfo>();
+        if (remotes.Count == 0) return list;
+        await using var daemon = await StartDaemonAsync(rclone, ct);
+        foreach (var r in remotes)
+        {
+            try
+            {
+                var about = await daemon.Rc.CallAsync("operations/about", new { fs = r.Name + ":" }, ct, TimeSpan.FromSeconds(45));
+                var (email, name) = r.Type == "drive" ? await IdentityAsync(daemon.Rc, r.Name, ct) : (null, null);
+                list.Add(new CloudAccountInfo(r.Name, email, name, Num(about["used"]), Num(about["total"]), Num(about["free"]), true));
+            }
+            catch (Exception e) when (e is RcException or HttpRequestException or JsonException || (e is OperationCanceledException && !ct.IsCancellationRequested))
+            {
+                _log.LogWarning("Account {Remote} could not be reached: {Error}", r.Name, Redactor.Redact(e.Message));
+                list.Add(new CloudAccountInfo(r.Name, null, null, null, null, null, false));
+            }
+        }
+        return list;
+    }
+
+    private static long? Num(JsonNode? n) =>
+        n is JsonValue v ? v.TryGetValue<long>(out var l) ? l : v.TryGetValue<double>(out var d) ? (long)d : null : null;
+
+    private static void ValidateClient(string clientId, string clientSecret)
+    {
+        if (string.IsNullOrWhiteSpace(clientId) || !clientId.Trim().EndsWith(".apps.googleusercontent.com", StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("The client ID must be a Google OAuth client ID ending in .apps.googleusercontent.com.");
+        if (string.IsNullOrWhiteSpace(clientSecret)) throw new ArgumentException("The client secret is required.");
+    }
+
+    /// <summary>Walks rclone's non-interactive config questions until it is done, answering sign-in defaults.</summary>
+    private async Task AnswerQuestionsAsync(RcClient rc, string remote, JsonNode node, Dictionary<string, string> answers,
+        IProgress<string>? progress, CancellationToken ct, bool allowSignIn = true)
+    {
+        for (int step = 0; step < 10; step++)
+        {
+            var state = node["State"]?.GetValue<string>() ?? "";
+            var err = node["Error"]?.GetValue<string>();
+            if (!string.IsNullOrEmpty(err)) throw new InvalidOperationException("Google Drive setup failed: " + Redactor.Redact(err));
+            if (string.IsNullOrEmpty(state)) return;
+            var option = node["Option"]?["Name"]?.GetValue<string>() ?? "";
+            if (option == "config_is_local" && !allowSignIn) throw new InvalidOperationException("rclone asked for a new browser sign-in.");
+            var answer = answers.TryGetValue(option, out var a) ? a : option switch
+            {
+                "config_is_local" => "true",
+                "config_change_team_drive" => "false",
+                _ => node["Option"]?["DefaultStr"]?.GetValue<string>() ?? ""
+            };
+            if (option == "config_is_local")
+                progress?.Report("Opening Google's sign-in page in your browser. Complete the consent there; Cloud-SSD never sees your password.");
+            else
+                progress?.Report($"Finishing configuration ({option})…");
+            _log.LogInformation("Drive config step {Option}", option);
+            node = await rc.CallAsync("config/update", new
+            {
+                name = remote,
+                parameters = new Dictionary<string, string>(),
+                opt = new { nonInteractive = true, obscure = false, @continue = true, state, result = answer }
+            }, ct, TimeSpan.FromMinutes(10));
+        }
+    }
+
+    /// <summary>A private "rclone rcd" on a random loopback port with random credentials, stopped on dispose.</summary>
+    private async Task<RcDaemon> StartDaemonAsync(RcloneInfo rclone, CancellationToken ct)
+    {
         var port = RcClient.FindFreeLoopbackPort();
         var user = SecretStore.RandomToken(12);
         var pass = SecretStore.RandomToken(24);
         var env = new Dictionary<string, string?>(_config.BaseEnvironment()) { ["RCLONE_RC_USER"] = user, ["RCLONE_RC_PASS"] = pass };
-        var runner = new RcloneRunner(rclone.Path, env);
-        var psi = runner.CreateStartInfo(["rcd", "--rc-addr", $"127.0.0.1:{port}"]);
-        using var proc = System.Diagnostics.Process.Start(psi)!;
-        proc.BeginOutputReadLine();
-        proc.BeginErrorReadLine();
-        using var rc = new RcClient(port, user, pass, TimeSpan.FromMinutes(10));
+        var psi = new RcloneRunner(rclone.Path, env).CreateStartInfo(["rcd", "--rc-addr", $"127.0.0.1:{port}"]);
+        var daemon = new RcDaemon(System.Diagnostics.Process.Start(psi)!, new RcClient(port, user, pass, TimeSpan.FromMinutes(10)));
+        daemon.Process.BeginOutputReadLine();
+        daemon.Process.BeginErrorReadLine();
         try
         {
-            for (int i = 0; i < 50 && !await rc.PingAsync(ct); i++) await Task.Delay(100, ct);
-
-            var parameters = new Dictionary<string, string> { ["scope"] = req.ReadOnlyScope ? "drive.readonly" : "drive" };
-            if (!req.UsesSharedClient)
-            {
-                parameters["client_id"] = req.ClientId.Trim();
-                parameters["client_secret"] = req.ClientSecret.Trim();
-            }
-            if (!string.IsNullOrWhiteSpace(req.RootFolderId)) parameters["root_folder_id"] = req.RootFolderId.Trim();
-
-            progress?.Report("Saving OAuth client configuration…");
-            var node = await rc.CallAsync("config/create", new
-            {
-                name = req.RemoteName,
-                type = "drive",
-                parameters,
-                opt = new { nonInteractive = true, obscure = false }
-            }, ct);
-
-            for (int step = 0; step < 10; step++)
-            {
-                var state = node["State"]?.GetValue<string>() ?? "";
-                var err = node["Error"]?.GetValue<string>();
-                if (!string.IsNullOrEmpty(err)) throw new InvalidOperationException("Google Drive setup failed: " + Redactor.Redact(err));
-                if (string.IsNullOrEmpty(state)) break;
-                var option = node["Option"]?["Name"]?.GetValue<string>() ?? "";
-                string answer = option switch
-                {
-                    "config_is_local" => "true",
-                    "config_change_team_drive" => "false",
-                    // rclone >= 1.75 warns that its shared client is being retired; the user chose it explicitly.
-                    "config_shared_client_id" => req.UsesSharedClient ? "true" : "false",
-                    _ => node["Option"]?["DefaultStr"]?.GetValue<string>() ?? ""
-                };
-                if (option == "config_is_local")
-                    progress?.Report("Opening Google's sign-in page in your browser. Complete the consent there; Cloud-SSD never sees your password.");
-                else
-                    progress?.Report($"Finishing configuration ({option})…");
-                _log.LogInformation("Drive config step {Option}", option);
-                node = await rc.CallAsync("config/update", new
-                {
-                    name = req.RemoteName,
-                    parameters = new Dictionary<string, string>(),
-                    opt = new { nonInteractive = true, obscure = false, @continue = true, state, result = answer }
-                }, ct, TimeSpan.FromMinutes(10));
-            }
-
-            // Verify the token works with a cheap metadata call.
-            progress?.Report("Verifying access to Google Drive…");
-            try
-            {
-                var about = await rc.CallAsync("operations/about", new { fs = req.RemoteName + ":" }, ct, TimeSpan.FromMinutes(1));
-                _log.LogInformation("Google Drive connected: quota total={Total} used={Used}", about["total"]?.ToString(), about["used"]?.ToString());
-            }
-            catch (RcException e)
-            {
-                // Do not leave a half-working login behind.
-                try { await rc.CallAsync("config/delete", new { name = req.RemoteName }, CancellationToken.None, TimeSpan.FromSeconds(10)); } catch (Exception) { }
-                throw GoogleSetupException.From(e.Message) ?? (Exception)e;
-            }
+            for (int i = 0; i < 50 && !await daemon.Rc.PingAsync(ct); i++) await Task.Delay(100, ct);
+            return daemon;
         }
-        finally
+        catch
         {
-            try { await rc.CallAsync("core/quit", null, CancellationToken.None, TimeSpan.FromSeconds(3)); } catch (Exception) { }
-            if (!proc.WaitForExit(3000)) try { proc.Kill(true); } catch (InvalidOperationException) { }
+            await daemon.DisposeAsync();
+            throw;
+        }
+    }
+
+    private sealed record RcDaemon(System.Diagnostics.Process Process, RcClient Rc) : IAsyncDisposable
+    {
+        public async ValueTask DisposeAsync()
+        {
+            try { await Rc.CallAsync("core/quit", null, CancellationToken.None, TimeSpan.FromSeconds(3)); } catch (Exception) { }
+            if (!Process.WaitForExit(3000)) try { Process.Kill(true); } catch (InvalidOperationException) { }
+            Rc.Dispose();
+            Process.Dispose();
         }
     }
 }

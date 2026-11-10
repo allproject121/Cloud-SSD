@@ -51,6 +51,11 @@ public sealed class MountSession
     public DateTime LastActivity = DateTime.Now;
 
     internal Process? Process;
+    /// <summary>
+    /// The rclone process while it has not finished starting. If it dies or is killed in that phase, whoever started
+    /// it reports the failure and schedules the retry; the process-exit handler must not start a second recovery.
+    /// </summary>
+    internal Process? StartingProcess;
     internal LogTailer? Tailer;
     internal RcloneLogParser? Parser;
     internal volatile bool StopRequested;
@@ -97,6 +102,8 @@ public sealed class RcloneMountService : IAsyncDisposable
     /// <summary>(mountId, path, offset, present, isPrefetch) for each cache lookup of an in-flight read.</summary>
     public event Action<string, string, long, bool, bool>? LookupObserved;
     public event Action<string, ProviderEvent>? ProviderEventObserved;
+    /// <summary>(mountId, folder relative to the drive root) each time a program lists a folder of a drive.</summary>
+    public event Action<string, string>? DirectoryListed;
 
     /// <summary>Restart policy: at most this many automatic restarts within <see cref="RestartWindow"/>.</summary>
     public int MaxRestarts { get; set; } = 5;
@@ -126,7 +133,11 @@ public sealed class RcloneMountService : IAsyncDisposable
         await _gate.WaitAsync(ct);
         try
         {
-            if (Get(request.Definition.Id) is { State: MountState.Mounted or MountState.Starting } existing) return existing;
+            var previous = Get(request.Definition.Id);
+            if (previous is { State: MountState.Mounted or MountState.Starting }) return previous;
+            // A failed session may still have an automatic restart pending. The new session takes over the drive, so
+            // the old one must give up; otherwise two rclone processes fight for the same drive letter.
+            if (previous != null) previous.StopRequested = true;
             var used = DriveLetterAllocator.UsedLetters();
             var letter = DriveLetterAllocator.Choose(request.Definition.DriveLetter, used)
                          ?? throw new InvalidOperationException("No free drive letter is available.");
@@ -136,7 +147,17 @@ public sealed class RcloneMountService : IAsyncDisposable
             PrepareCacheDir(request.CacheDir);
             var session = new MountSession(request, letter);
             lock (_sessions) _sessions[request.Definition.Id] = session;
-            await StartProcessAsync(session, rclone, ct);
+            try
+            {
+                await StartProcessAsync(session, rclone, ct);
+            }
+            catch (Exception e) when (e is not OperationCanceledException)
+            {
+                // The caller gets the error; one background retry loop keeps trying (a start often times out only
+                // because the provider is rate limiting). A later MountAsync for this drive supersedes that loop.
+                _ = AutoRestartAsync(session);
+                throw;
+            }
             return session;
         }
         finally
@@ -189,6 +210,7 @@ public sealed class RcloneMountService : IAsyncDisposable
 
         var proc = new Process { StartInfo = psi, EnableRaisingEvents = true };
         proc.Exited += (_, _) => OnProcessExited(s, proc);
+        s.StartingProcess = proc;
         proc.Start();
         proc.OutputDataReceived += (_, _) => { };
         proc.ErrorDataReceived += (_, e) => { if (!string.IsNullOrEmpty(e.Data)) _log.LogDebug("rclone[{Id}] stderr: {Line}", s.Id, Redactor.Redact(e.Data)); };
@@ -216,21 +238,11 @@ public sealed class RcloneMountService : IAsyncDisposable
                 s.State = MountState.Mounted;
                 s.Since = DateTimeOffset.Now;
                 s.FailedPings = 0;
+                s.StartingProcess = null; // from here on an exit is a crash, handled by OnProcessExited
                 Persist();
                 Publish(s, $"Mounted at {s.DriveLetter}:");
-                // Pre-populate VFS directory tree recursively in RAM so folder browsing is 0 ms
-                _ = Task.Run(async () =>
-                {
-                    try
-                    {
-                        await Task.Delay(1000);
-                        if (s.Rc != null)
-                        {
-                            await s.Rc.CallAsync("vfs/refresh", new Dictionary<string, object> { ["recursive"] = "true" });
-                        }
-                    }
-                    catch { }
-                });
+                // The directory tree is pre-loaded by the --vfs-refresh mount flag; a second recursive vfs/refresh here
+                // walked the whole drive again, competing with game reads for the Drive API rate limit.
                 return;
             }
             await Task.Delay(250, ct);
@@ -248,6 +260,7 @@ public sealed class RcloneMountService : IAsyncDisposable
         s.Parser.Read += e => { s.LastActivity = DateTime.Now; ReadObserved?.Invoke(e); };
         s.Parser.Provider += e => OnProviderEvent(s, e);
         s.Parser.Lookup += (path, off, present, pre) => LookupObserved?.Invoke(s.Id, path, off, present, pre);
+        s.Parser.DirectoryListed += dir => DirectoryListed?.Invoke(s.Id, dir);
         var parser = s.Parser;
         s.Tailer = new LogTailer(s.LogFile, parser.ParseLine, fromEnd);
     }
@@ -270,6 +283,10 @@ public sealed class RcloneMountService : IAsyncDisposable
     private void OnProcessExited(MountSession s, Process proc)
     {
         if (!ReferenceEquals(s.Process, proc)) return;
+        // A process that never finished starting: StartProcessAsync reports it to its caller, which owns the retry.
+        if (ReferenceEquals(s.StartingProcess, proc)) return;
+        // A newer session owns this drive now; a late exit of the old process must not mark the drive as stopped.
+        if (Get(s.Id) is { } current && !ReferenceEquals(current, s)) return;
         int code = -1;
         try { code = proc.ExitCode; } catch (InvalidOperationException) { }
         if (s.StopRequested)
@@ -285,8 +302,12 @@ public sealed class RcloneMountService : IAsyncDisposable
         _ = AutoRestartAsync(s);
     }
 
+    /// <summary>True while this session is still the one in charge of its drive and nobody asked it to stop.</summary>
+    private bool MayRestart(MountSession s) => !s.StopRequested && ReferenceEquals(Get(s.Id), s);
+
     private async Task AutoRestartAsync(MountSession s)
     {
+        if (!MayRestart(s)) return;
         var now = DateTime.UtcNow;
         s.RestartTimes.RemoveAll(t => now - t > RestartWindow);
         if (s.RestartTimes.Count >= MaxRestarts || _rclone is null)
@@ -299,12 +320,15 @@ public sealed class RcloneMountService : IAsyncDisposable
         s.RestartCount++;
         Publish(s, $"Restarting mount in {delay.TotalSeconds:0} s (attempt {s.RestartCount})…");
         await Task.Delay(delay);
-        if (s.StopRequested) return;
+        if (!MayRestart(s)) return;
         // WinFsp releases the drive letter asynchronously after the process dies.
         for (int i = 0; i < 40 && Directory.Exists(s.Root); i++) await Task.Delay(250);
         await _gate.WaitAsync();
         try
         {
+            // Unmounted or replaced by a manual connect while this was waiting: that session owns the drive now.
+            // Already mounted again: another restart of this same session got here first.
+            if (!MayRestart(s) || s.State == MountState.Mounted) return;
             await StartProcessAsync(s, _rclone, CancellationToken.None);
             _log.LogInformation("Mount {Id} restarted successfully; cached data was preserved", s.Id);
         }
