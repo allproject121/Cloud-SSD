@@ -136,6 +136,11 @@ public sealed class RcloneConfigService
             .Select(u => u.Contains('=') ? u[(u.IndexOf('=') + 1)..] : u)
             .Where(u => u.IndexOf(':') > 0).Select(u => u[..u.IndexOf(':')]).ToList();
 
+    /// <summary>Alias remotes with the remote they stand for ("gdrive:").</summary>
+    public static IReadOnlyList<(string Name, string Target)> Aliases(JsonObject dump) =>
+        dump.Where(kv => kv.Value is JsonObject o && Str(o, "type") == "alias")
+            .Select(kv => (kv.Key, Str((JsonObject)kv.Value!, "remote"))).ToList();
+
     /// <summary>Combine remotes (one drive with a folder per account) with their upstream list.</summary>
     public static IReadOnlyList<(string Name, string Upstreams)> Combines(JsonObject dump) =>
         dump.Where(kv => kv.Value is JsonObject o && Str(o, "type") == "combine")

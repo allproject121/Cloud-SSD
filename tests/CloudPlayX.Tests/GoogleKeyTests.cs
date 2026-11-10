@@ -52,6 +52,17 @@ public class GoogleKeyTests
     }
 
     [Fact]
+    public void All_accounts_drive_is_an_alias_for_one_account_and_a_union_for_more()
+    {
+        // rclone refuses "union can't point to a single upstream", so one account must not become a union.
+        Assert.Equal(("alias", "remote", "gdrive:"), CloudPlayX.App.AppHost.CombinedRemoteSpec(["gdrive"], []));
+        Assert.Equal(("alias", "remote", "gdrive:"), CloudPlayX.App.AppHost.CombinedRemoteSpec(["gdrive"], ["gdrive"]));
+        Assert.Equal(("union", "upstreams", "gdrive: gdrive2::ro"), CloudPlayX.App.AppHost.CombinedRemoteSpec(["gdrive", "gdrive2"], ["gdrive2"]));
+        var dump = JsonNode.Parse("""{ "CloudSSD": { "type": "alias", "remote": "gdrive:" }, "gdrive": { "type": "drive" } }""")!.AsObject();
+        Assert.Equal(("CloudSSD", "gdrive:"), Assert.Single(RcloneConfigService.Aliases(dump)));
+    }
+
+    [Fact]
     public void Remotes_Using_Does_Not_Match_Name_Prefixes()
     {
         // "Drive10" must not be treated as used by anything that references "Drive1:".

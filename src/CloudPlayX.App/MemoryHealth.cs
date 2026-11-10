@@ -12,24 +12,30 @@ public sealed record PageFileInfo(string Path, long AllocatedBytes, long UsedByt
 /// <summary>
 /// RAM held by all processes of one app (their working sets added up). CanClose: it has a window of its own in
 /// this user's session and is not a Windows or Cloud-SSD process, so asking it to close is safe to offer.
+/// Title is the app's own description ("Microsoft Edge WebView2") when Windows lets us read it.
 /// </summary>
-public sealed record AppMemory(string Name, int Processes, long WorkingSetBytes, bool CanClose = false);
+public sealed record AppMemory(string Name, int Processes, long WorkingSetBytes, bool CanClose = false, string? Title = null);
 
 /// <summary>
 /// What Windows reports about memory right now. Commit is what apps have reserved; its limit is RAM + page files.
-/// PageFileSystemManaged is null when the setting could not be read.
+/// PageFileSystemManaged is null when the setting could not be read. TopApps lists only apps the user could
+/// close; Windows' and Cloud-SSD's own processes are added up in SystemBytes.
 /// </summary>
 public sealed record MemorySnapshot(
     long PhysicalTotalBytes, long PhysicalAvailableBytes, long CommitUsedBytes, long CommitLimitBytes,
     IReadOnlyList<PageFileInfo> PageFiles, bool? PageFileSystemManaged,
     string? PageFileVolume, long? PageFileVolumeFreeBytes, bool CacheSharesPageFileVolume,
-    IReadOnlyList<AppMemory> TopApps)
+    IReadOnlyList<AppMemory> TopApps, long SystemBytes = 0, int SystemProcesses = 0)
 {
     public double RamUsedFraction => PhysicalTotalBytes <= 0 ? 0 : 1 - (double)PhysicalAvailableBytes / PhysicalTotalBytes;
     public double CommitUsedFraction => CommitLimitBytes <= 0 ? 0 : (double)CommitUsedBytes / CommitLimitBytes;
 }
 
-public sealed record MemoryAdvice(string Text, string Tone);
+/// <summary>One finding. Format is an English sentence with {0}-style places for Args, so the UI can translate it.</summary>
+public sealed record MemoryAdvice(string Format, object[] Args, string Tone)
+{
+    public string Text => string.Format(Format, Args);
+}
 
 /// <summary>
 /// Memory check for the PC Memory page: RAM, commit, page file and the apps holding the most RAM. Needs no admin
@@ -40,6 +46,8 @@ public static class MemoryHealth
 {
     /// <summary>With this share of RAM in use Windows starts leaning on the page file.</summary>
     public const double RamAlmostFullFraction = 0.85;
+    /// <summary>With less than this share of RAM free the PC is "low on RAM": advice says so and auto mode acts.</summary>
+    public const double RamLowFreeFraction = 0.30;
     /// <summary>At the commit limit allocations fail and apps close with "out of memory".</summary>
     public const double CommitNearLimitFraction = 0.90;
     /// <summary>Room the page file's drive should keep so Windows can grow it.</summary>
@@ -85,10 +93,17 @@ public static class MemoryHealth
             catch (Exception e) when (e is Win32Exception or IOException or ArgumentException) { }
         }
 
+        var (apps, systemBytes, systemProcesses) = ReadTopApps(topApps);
         return new MemorySnapshot((long)perf.PhysicalTotal * page, (long)perf.PhysicalAvailable * page,
             (long)perf.CommitTotal * page, (long)perf.CommitLimit * page,
-            files, IsSystemManaged(ReadPagingFilesSetting()), volume, volumeFree, shared, ReadTopApps(topApps));
+            files, IsSystemManaged(ReadPagingFilesSetting()), volume, volumeFree, shared, apps, systemBytes, systemProcesses);
     }
+
+    /// <summary>Sizes the way Task Manager shows them: "7.3 GB", "865 MB".</summary>
+    public static string Size(long bytes) =>
+        bytes >= 10 * ByteSize.GiB ? $"{bytes / (double)ByteSize.GiB:0.0} GB"
+        : bytes >= ByteSize.GiB ? $"{bytes / (double)ByteSize.GiB:0.00} GB"
+        : $"{bytes / (double)ByteSize.MiB:0} MB";
 
     /// <summary>Only RAM total and free: cheap enough to sample every second for a chart.</summary>
     public static (long TotalBytes, long AvailableBytes) ReadRam()
@@ -101,23 +116,30 @@ public static class MemoryHealth
     public static IReadOnlyList<MemoryAdvice> Advise(MemorySnapshot s)
     {
         var list = new List<MemoryAdvice>();
+        void Add(string tone, string format, params object[] args) => list.Add(new(format, args, tone));
+
         if (s.PageFiles.Count == 0)
-            list.Add(new("Windows has no page file. When RAM is full, games and apps will close with an 'out of memory' error. " +
-                         "In Windows, turn on 'Automatically manage paging file size for all drives'.", "error"));
+            Add("error", "Windows has no page file. When RAM is full, games and apps will close with an 'out of memory' error. " +
+                         "In Windows, turn on 'Automatically manage paging file size for all drives'.");
         if (s.CommitUsedFraction >= CommitNearLimitFraction)
-            list.Add(new($"Apps have reserved {ByteSize.Format(s.CommitUsedBytes)} of the {ByteSize.Format(s.CommitLimitBytes)} Windows can give (RAM + page file). " +
+            Add("error", "Apps have reserved {0} of the {1} Windows can give (RAM + page file). " +
                          "At the limit, games close with an 'out of memory' error. Close apps you do not need." +
-                         (s.PageFileSystemManaged == false ? " The page file has a fixed size; set it back to 'Automatically manage' so Windows can grow it." : ""), "error"));
+                         (s.PageFileSystemManaged == false ? " The page file has a fixed size; set it back to 'Automatically manage' so Windows can grow it." : ""),
+                Size(s.CommitUsedBytes), Size(s.CommitLimitBytes));
         if (s.RamUsedFraction >= RamAlmostFullFraction)
-            list.Add(new($"RAM is almost full: only {ByteSize.Format(s.PhysicalAvailableBytes)} of {ByteSize.Format(s.PhysicalTotalBytes)} is free. " +
-                         "When RAM runs out, Windows uses the page file on the SSD, which is far slower and makes games stutter. " +
-                         "Close apps from the list before you play.", "warn"));
+            Add("warn", "RAM is almost full: only {0} of {1} is free. " +
+                        "When RAM runs out, Windows uses the page file on the SSD, which is far slower and makes games stutter. " +
+                        "Close apps from the list before you play.", Size(s.PhysicalAvailableBytes), Size(s.PhysicalTotalBytes));
+        else if (1 - s.RamUsedFraction < RamLowFreeFraction)
+            Add("accent", "RAM is getting low: {0} of {1} is free ({2}). Close apps you do not need before you play.",
+                Size(s.PhysicalAvailableBytes), Size(s.PhysicalTotalBytes), $"{1 - s.RamUsedFraction:P0}");
         if (s.PageFileVolumeFreeBytes is { } free && free < PageFileRoomBytes)
-            list.Add(new($"Only {ByteSize.Format(free)} free on {s.PageFileVolume}. Windows needs space there to grow the page file" +
-                         (s.CacheSharesPageFileVolume ? ", and the Cloud-SSD cache uses the same drive" : "") +
-                         $". Keep at least {ByteSize.Format(PageFileRoomBytes)} free.", "warn"));
+            Add("warn", s.CacheSharesPageFileVolume
+                    ? "Only {0} free on {1}. Windows needs space there to grow the page file, and the Cloud-SSD cache uses the same drive. Keep at least {2} free."
+                    : "Only {0} free on {1}. Windows needs space there to grow the page file. Keep at least {2} free.",
+                Size(free), s.PageFileVolume ?? "", Size(PageFileRoomBytes));
         if (list.Count == 0)
-            list.Add(new($"Memory looks healthy: {ByteSize.Format(s.PhysicalAvailableBytes)} of RAM is free.", "ok"));
+            Add("ok", "Memory looks healthy: {0} of RAM is free.", Size(s.PhysicalAvailableBytes));
         return list;
     }
 
@@ -140,6 +162,50 @@ public static class MemoryHealth
         foreach (var (window, pid) in AppWindows())
             if (pids.Contains(pid) && PostMessageW(window, WmClose, IntPtr.Zero, IntPtr.Zero)) asked++;
         return asked;
+    }
+
+    /// <summary>Name of the app whose window is in front, or null when there is none or it cannot be read.</summary>
+    public static string? ForegroundApp()
+    {
+        var window = GetForegroundWindow();
+        if (window == IntPtr.Zero || GetWindowThreadProcessId(window, out var pid) == 0) return null;
+        try
+        {
+            using var p = Process.GetProcessById((int)pid);
+            return p.ProcessName;
+        }
+        catch (Exception e) when (e is ArgumentException or InvalidOperationException) { return null; }
+    }
+
+    /// <summary>
+    /// Moves the memory of this user's background apps out of RAM (Windows keeps it compressed or in the page
+    /// file and reads it back when the app is used again). Nothing is closed. Skips the named apps, Windows and
+    /// Cloud-SSD processes, and apps too small to matter. Returns how many apps were moved.
+    /// </summary>
+    public static int TrimBackgroundApps(ISet<string> skip, long minWorkingSetBytes = 32 * ByteSize.MiB)
+    {
+        int session = Process.GetCurrentProcess().SessionId;
+        var trimmed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var p in Process.GetProcesses())
+        {
+            try
+            {
+                if (p.SessionId != session || p.WorkingSet64 < minWorkingSetBytes || IsProtected(p.ProcessName) || skip.Contains(p.ProcessName)) continue;
+                if (Trim(p.Id)) trimmed.Add(p.ProcessName);
+            }
+            catch (InvalidOperationException) { } // the process exited while being read
+            finally { p.Dispose(); }
+        }
+        return trimmed.Count;
+    }
+
+    /// <summary>False when Windows refuses, for example for a process that runs as administrator.</summary>
+    internal static bool Trim(int processId)
+    {
+        var handle = OpenProcess(ProcessSetQuota | ProcessQueryLimitedInformation, false, (uint)processId);
+        if (handle == IntPtr.Zero) return false;
+        try { return K32EmptyWorkingSet(handle); }
+        finally { CloseHandle(handle); }
     }
 
     public static bool IsRunning(string appName)
@@ -187,25 +253,55 @@ public static class MemoryHealth
         catch (Exception e) when (e is System.Security.SecurityException or UnauthorizedAccessException or IOException) { return null; }
     }
 
-    private static IReadOnlyList<AppMemory> ReadTopApps(int count)
+    /// <summary>
+    /// The apps holding the most RAM, biggest first. Windows' and Cloud-SSD's own processes are not listed (the
+    /// user cannot do anything about them); their RAM is returned as one total instead.
+    /// </summary>
+    private static (IReadOnlyList<AppMemory> Apps, long SystemBytes, int SystemProcesses) ReadTopApps(int count)
     {
         int session = Process.GetCurrentProcess().SessionId;
         var windowed = AppWindows().Select(w => w.ProcessId).ToHashSet();
-        var byName = new Dictionary<string, (int Processes, long Bytes, bool HasWindow)>(StringComparer.OrdinalIgnoreCase);
+        var byName = new Dictionary<string, (int Processes, long Bytes, bool HasWindow, int BiggestId, long BiggestBytes)>(StringComparer.OrdinalIgnoreCase);
+        long systemBytes = 0;
+        int systemProcesses = 0;
         foreach (var p in Process.GetProcesses())
         {
             try
             {
-                if (p.ProcessName == CompressionProcess) continue;
+                long bytes = p.WorkingSet64;
+                if (IsProtected(p.ProcessName))
+                {
+                    systemBytes += bytes;
+                    systemProcesses++;
+                    continue;
+                }
                 byName.TryGetValue(p.ProcessName, out var cur);
-                byName[p.ProcessName] = (cur.Processes + 1, cur.Bytes + p.WorkingSet64,
-                    cur.HasWindow || (p.SessionId == session && windowed.Contains((uint)p.Id)));
+                bool biggest = bytes > cur.BiggestBytes;
+                byName[p.ProcessName] = (cur.Processes + 1, cur.Bytes + bytes,
+                    cur.HasWindow || (p.SessionId == session && windowed.Contains((uint)p.Id)),
+                    biggest ? p.Id : cur.BiggestId, biggest ? bytes : cur.BiggestBytes);
             }
             catch (InvalidOperationException) { } // the process exited while being read
             finally { p.Dispose(); }
         }
-        return byName.OrderByDescending(kv => kv.Value.Bytes).Take(count)
-            .Select(kv => new AppMemory(kv.Key, kv.Value.Processes, kv.Value.Bytes, kv.Value.HasWindow && !IsProtected(kv.Key))).ToList();
+        var apps = byName.OrderByDescending(kv => kv.Value.Bytes).Take(count)
+            .Select(kv => new AppMemory(kv.Key, kv.Value.Processes, kv.Value.Bytes, kv.Value.HasWindow, Describe(kv.Value.BiggestId))).ToList();
+        return (apps, systemBytes, systemProcesses);
+    }
+
+    /// <summary>Frameworks many unrelated apps are built on; their description says nothing about which app it is.</summary>
+    private static readonly HashSet<string> GenericDescriptions = new(StringComparer.OrdinalIgnoreCase) { "Electron", "Node.js JavaScript Runtime", ".NET Host" };
+
+    /// <summary>The description the app's maker gave its program file, or null when it is missing, generic or unreadable.</summary>
+    private static string? Describe(int processId)
+    {
+        try
+        {
+            using var p = Process.GetProcessById(processId);
+            var text = p.MainModule?.FileVersionInfo.FileDescription?.Trim();
+            return string.IsNullOrEmpty(text) || GenericDescriptions.Contains(text) ? null : text;
+        }
+        catch (Exception e) when (e is Win32Exception or InvalidOperationException or ArgumentException or NotSupportedException) { return null; }
     }
 
     /// <summary>Visible top-level windows without an owner (what the taskbar shows), with their process id.</summary>
@@ -223,7 +319,7 @@ public static class MemoryHealth
         return list;
     }
 
-    private const uint WmClose = 0x0010, GwOwner = 4;
+    private const uint WmClose = 0x0010, GwOwner = 4, ProcessSetQuota = 0x0100, ProcessQueryLimitedInformation = 0x1000;
 
     // All sizes are in pages.
     [StructLayout(LayoutKind.Sequential)]
@@ -252,6 +348,18 @@ public static class MemoryHealth
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool K32EnumPageFilesW(EnumPageFilesCallback callback, IntPtr context);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr OpenProcess(uint access, bool inherit, uint processId);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool K32EmptyWorkingSet(IntPtr process);
+
+    [DllImport("kernel32.dll")]
+    private static extern bool CloseHandle(IntPtr handle);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
 
     [DllImport("user32.dll")]
     private static extern bool EnumWindows(EnumWindowsCallback callback, IntPtr context);

@@ -38,6 +38,10 @@ public static class LocalizationManager
     private static readonly DependencyProperty OriginalTextProperty =
         DependencyProperty.RegisterAttached("OriginalText", typeof(string), typeof(LocalizationManager));
 
+    /// <summary>What the last pass put on screen, to tell "we translated it" from "the app changed it".</summary>
+    private static readonly DependencyProperty TranslatedTextProperty =
+        DependencyProperty.RegisterAttached("TranslatedText", typeof(string), typeof(LocalizationManager));
+
     public static event Action? LanguageChanged;
 
     static LocalizationManager()
@@ -132,7 +136,9 @@ public static class LocalizationManager
                 if (binding == null)
                 {
                     var orig = (string)tb.GetValue(OriginalTextProperty);
-                    if (orig == null)
+                    // Text that is neither the stored original nor what we last showed was changed by the app
+                    // itself (the selected item of a list, a status line), so it becomes the new original.
+                    if (orig == null || (tb.Text != orig && tb.Text != (string)tb.GetValue(TranslatedTextProperty)))
                     {
                         orig = tb.Text;
                         tb.SetValue(OriginalTextProperty, orig);
@@ -140,6 +146,7 @@ public static class LocalizationManager
                     if (!string.IsNullOrEmpty(orig))
                     {
                         var trans = T(orig);
+                        tb.SetValue(TranslatedTextProperty, trans);
                         if (tb.Text != trans) tb.Text = trans;
                     }
                 }
@@ -158,6 +165,9 @@ public static class LocalizationManager
                     var trans = T(orig);
                     if (!Equals(btn.Content, trans)) btn.Content = trans;
                 }
+                // The control shows its text through an inner TextBlock. Translating that one too would pin it
+                // to the text it had on the first pass, and the control would then ignore later language changes.
+                return;
             }
             else if (root is CheckBox cb && cb.Content is string cbStr)
             {
@@ -173,6 +183,7 @@ public static class LocalizationManager
                     var trans = T(orig);
                     if (!Equals(cb.Content, trans)) cb.Content = trans;
                 }
+                return;
             }
             else if (root is RadioButton rb && rb.Content is string rbStr)
             {
@@ -188,6 +199,7 @@ public static class LocalizationManager
                     var trans = T(orig);
                     if (!Equals(rb.Content, trans)) rb.Content = trans;
                 }
+                return;
             }
             else if (root is Label lbl && lbl.Content is string lblStr)
             {
@@ -203,6 +215,7 @@ public static class LocalizationManager
                     var trans = T(orig);
                     if (!Equals(lbl.Content, trans)) lbl.Content = trans;
                 }
+                return;
             }
             else if (root is HeaderedContentControl hcc && hcc.Header is string hStr)
             {
@@ -321,18 +334,56 @@ public static class LocalizationManager
             ["Totals since start"] = "Ab tak ka Total Data",
 
             // PC Memory View
+            ["Auto mode: when less than 30% of RAM is free, move idle background apps out of RAM"] = "Auto mode: jab 30% se kam RAM khali ho, to bekaar pade background apps ko RAM se hata do",
+            ["Run now"] = "Abhi Chalao",
+            ["Nothing is closed and nothing is lost. A moved app is a little slow the next time you open it. Apps you used in the last 15 minutes, a running game, Windows and Cloud-SSD are left alone."] = "Koi app band nahi hota, kuch khota nahi. Hataya gaya app agli baar kholne par thoda slow chalega. Pichhle 15 minute me use kiye apps, chalta game, Windows aur Cloud-SSD ko nahi chheda jata.",
             ["RAM IN USE"] = "RAM USE HO RAHI HAI",
             ["RAM FREE"] = "RAM KHALI",
-            ["RESERVED BY APPS (COMMIT)"] = "APPS NE RESERVE KI (COMMIT)",
+            ["RESERVED BY APPS"] = "APPS NE RESERVE KI",
             ["Page file"] = "Page File (Virtual Memory)",
             ["RAM use (last 5 min)"] = "RAM ka Use (pichhle 5 min)",
             ["Near the top, Windows starts using the page file on the SSD and games stutter."] = "Upar ke paas pahunchne par Windows SSD ki page file use karta hai aur game atakta hai.",
-            ["Open Windows page-file settings"] = "Windows ki Page-File Settings Kholein",
+            ["Open Windows page-file settings"] = "Page-File Settings Kholein",
             ["Best setting: 'Automatically manage paging file size for all drives'. A page file stops crashes when RAM is full; it does not make the PC faster."] = "Sabse sahi setting: 'Automatically manage paging file size for all drives'. Page file RAM full hone par crash rokti hai; PC tez nahi karti.",
             ["Apps using the most RAM"] = "Sabse zyada RAM lene wale Apps",
             ["Close"] = "Band Karein",
-            ["RAM held by all of an app's processes together (approximate). Close asks the app to close the normal way, like pressing X; Windows and Cloud-SSD processes have no Close button."] = "Ek app ke saare processes ki RAM milakar (andaza). Band Karein dabane par app normal tareeke se band hota hai, jaise X dabana; Windows aur Cloud-SSD ke process par yeh button nahi hota.",
+            ["RAM held by all of an app's processes together (approximate). Close asks the app to close the normal way, like pressing X. Apps without a window of their own have no Close button."] = "Ek app ke saare processes ki RAM milakar (andaza). Band Karein dabane par app normal tareeke se band hota hai, jaise X dabana. Jin apps ki apni window nahi hai un par yeh button nahi hota.",
             ["This page only reads what Windows reports. It never changes a Windows setting and closes an app only when you press Close."] = "Yeh page sirf wahi dikhata hai jo Windows batata hai. Koi Windows setting nahi badalta, aur app tabhi band karta hai jab aap Band Karein dabayein.",
+
+            // PC Memory View: text built while the app runs ({0}, {1}… are filled in after translation)
+            ["Windows has no page file. When RAM is full, games and apps will close with an 'out of memory' error. In Windows, turn on 'Automatically manage paging file size for all drives'."] = "Windows me page file nahi hai. RAM full hone par games aur apps 'out of memory' error dekar band ho jayenge. Windows me 'Automatically manage paging file size for all drives' chalu karein.",
+            ["Apps have reserved {0} of the {1} Windows can give (RAM + page file). At the limit, games close with an 'out of memory' error. Close apps you do not need."] = "Apps ne {1} me se {0} reserve kar liya hai (RAM + page file). Limit par pahunchte hi games 'out of memory' error dekar band ho jate hain. Jo apps nahi chahiye unhe band karein.",
+            ["Apps have reserved {0} of the {1} Windows can give (RAM + page file). At the limit, games close with an 'out of memory' error. Close apps you do not need. The page file has a fixed size; set it back to 'Automatically manage' so Windows can grow it."] = "Apps ne {1} me se {0} reserve kar liya hai (RAM + page file). Limit par pahunchte hi games 'out of memory' error dekar band ho jate hain. Jo apps nahi chahiye unhe band karein. Page file ka size fixed hai; ise wapas 'Automatically manage' par karein taaki Windows ise badha sake.",
+            ["RAM is almost full: only {0} of {1} is free. When RAM runs out, Windows uses the page file on the SSD, which is far slower and makes games stutter. Close apps from the list before you play."] = "RAM lagbhag full hai: {1} me se sirf {0} khali hai. RAM khatam hone par Windows SSD ki page file use karta hai, jo bahut slow hai aur game atakta hai. Khelne se pehle list se apps band karein.",
+            ["RAM is getting low: {0} of {1} is free ({2}). Close apps you do not need before you play."] = "RAM kam ho rahi hai: {1} me se {0} khali hai ({2}). Khelne se pehle jo apps nahi chahiye unhe band karein.",
+            ["Only {0} free on {1}. Windows needs space there to grow the page file. Keep at least {2} free."] = "{1} par sirf {0} khali hai. Page file badhane ke liye Windows ko wahan jagah chahiye. Kam se kam {2} khali rakhein.",
+            ["Only {0} free on {1}. Windows needs space there to grow the page file, and the Cloud-SSD cache uses the same drive. Keep at least {2} free."] = "{1} par sirf {0} khali hai. Page file badhane ke liye Windows ko wahan jagah chahiye, aur Cloud-SSD ka cache bhi isi drive par hai. Kam se kam {2} khali rakhein.",
+            ["Memory looks healthy: {0} of RAM is free."] = "Memory theek hai: {0} RAM khali hai.",
+            ["Windows did not report memory figures."] = "Windows ne memory ki jaankari nahi di.",
+            ["Last run {0}: moved {1} idle app(s) out of RAM, free RAM {2} → {3}."] = "Pichhli baar {0}: {1} bekaar pade app RAM se hataye, khali RAM {2} → {3}.",
+            ["Still below {0} free: the apps you are using need the RAM, so auto mode waits longer before it tries again. Close an app from the list to free more."] = "Abhi bhi {0} se kam khali hai: jo apps aap use kar rahe ho unhe RAM chahiye, isliye auto mode agli koshish se pehle zyada der rukega. Aur RAM khali karne ke liye list se koi app band karein.",
+            ["Auto mode is off."] = "Auto mode band hai.",
+            ["Watching: {0} of RAM is free, auto mode acts below {1}."] = "Nazar rakh raha hai: {0} RAM khali hai, auto mode {1} se kam par chalega.",
+            ["RAM is low ({0} free); auto mode can act in {1} min."] = "RAM kam hai ({0} khali); auto mode {1} min me chal sakta hai.",
+            ["RAM is low ({0} free); auto mode is acting now."] = "RAM kam hai ({0} khali); auto mode abhi chal raha hai.",
+            ["Auto mode is already running."] = "Auto mode pehle se chal raha hai.",
+            ["No idle background app to move: everything open was used in the last few minutes or belongs to Windows."] = "Hatane ke liye koi bekaar pada background app nahi hai: jo bhi khula hai woh abhi-abhi use hua hai ya Windows ka hai.",
+            ["Moved {0} idle app(s) out of RAM. Free RAM went from {1} to {2}."] = "{0} bekaar pade app RAM se hataye. Khali RAM {1} se {2} ho gayi.",
+            ["Close {0}?\n\nCloud Drive asks it to close the normal way, like pressing X. If it asks you to save your work, answer it — unsaved work can be lost."] = "{0} band karein?\n\nCloud Drive ise normal tareeke se band hone ko kehta hai, jaise X dabana. Agar yeh kaam save karne ko pooche to jawab dein — bina save kiya kaam kho sakta hai.",
+            ["{0} has no window Cloud Drive can close. Close it yourself or use Task Manager."] = "{0} ki koi window nahi hai jise Cloud Drive band kar sake. Ise khud band karein ya Task Manager use karein.",
+            ["{0} was asked to close but is still running. It may be waiting for you to save."] = "{0} ko band hone ko kaha gaya par yeh abhi bhi chal raha hai. Shayad yeh aapke save karne ka intezaar kar raha hai.",
+            ["{0} closed. Free RAM went from {1} to {2}."] = "{0} band ho gaya. Khali RAM {1} se {2} ho gayi.",
+            ["Could not open the Windows settings: {0}"] = "Windows settings nahi khul payi: {0}",
+            ["{0} in use"] = "{0} use me",
+            ["of {0} · {1}"] = "{0} me se · {1}",
+            ["of {0} limit (RAM + page file)"] = "limit {0} (RAM + page file)",
+            ["None"] = "Nahi hai",
+            ["In use"] = "Use me",
+            ["Free on {0}"] = "{0} par khali",
+            ["{0} · sized by Windows"] = "{0} · Windows khud tay karta hai",
+            ["{0} · peak {1}"] = "{0} · sabse zyada {1}",
+            ["{0} · shared with the Cloud-SSD cache"] = "{0} · Cloud-SSD cache bhi isi par hai",
+            ["Windows and Cloud-SSD ({0} processes) — cannot be closed"] = "Windows aur Cloud-SSD ({0} processes) — band nahi ho sakte",
 
             // Settings View
             ["Network"] = "Internet / Network Settings",
@@ -439,18 +490,60 @@ public static class LocalizationManager
             ["Totals since start"] = "प्रारंभ से कुल डेटा",
 
             // PC Memory View
+            ["Auto mode: when less than 30% of RAM is free, move idle background apps out of RAM"] = "ऑटो मोड: जब 30% से कम रैम खाली हो, तो बेकार पड़े बैकग्राउंड ऐप्स को रैम से हटा दो",
+            ["Run now"] = "अभी चलाएँ",
+            ["Nothing is closed and nothing is lost. A moved app is a little slow the next time you open it. Apps you used in the last 15 minutes, a running game, Windows and Cloud-SSD are left alone."] = "कोई ऐप बंद नहीं होता, कुछ खोता नहीं। हटाया गया ऐप अगली बार खोलने पर थोड़ा धीमा चलेगा। पिछले 15 मिनट में इस्तेमाल किए ऐप्स, चलता गेम, विंडोज़ और Cloud-SSD को नहीं छेड़ा जाता।",
             ["RAM IN USE"] = "उपयोग में रैम",
             ["RAM FREE"] = "खाली रैम",
-            ["RESERVED BY APPS (COMMIT)"] = "ऐप्स द्वारा आरक्षित (कमिट)",
+            ["RESERVED BY APPS"] = "ऐप्स द्वारा आरक्षित",
             ["Page file"] = "पेज फ़ाइल (वर्चुअल मेमोरी)",
             ["RAM use (last 5 min)"] = "रैम उपयोग (पिछले 5 मिनट)",
             ["Near the top, Windows starts using the page file on the SSD and games stutter."] = "ऊपर के पास पहुँचने पर विंडोज़ एसएसडी की पेज फ़ाइल इस्तेमाल करता है और गेम अटकता है।",
-            ["Open Windows page-file settings"] = "विंडोज़ की पेज-फ़ाइल सेटिंग्स खोलें",
+            ["Open Windows page-file settings"] = "पेज-फ़ाइल सेटिंग्स खोलें",
             ["Best setting: 'Automatically manage paging file size for all drives'. A page file stops crashes when RAM is full; it does not make the PC faster."] = "सबसे सही सेटिंग: 'Automatically manage paging file size for all drives'। पेज फ़ाइल रैम भरने पर क्रैश रोकती है; पीसी तेज़ नहीं करती।",
             ["Apps using the most RAM"] = "सबसे ज़्यादा रैम लेने वाले ऐप्स",
             ["Close"] = "बंद करें",
-            ["RAM held by all of an app's processes together (approximate). Close asks the app to close the normal way, like pressing X; Windows and Cloud-SSD processes have no Close button."] = "एक ऐप के सभी प्रोसेस की रैम मिलाकर (अनुमानित)। बंद करें दबाने पर ऐप सामान्य तरीके से बंद होता है, जैसे X दबाना; विंडोज़ और Cloud-SSD के प्रोसेस पर यह बटन नहीं होता।",
+            ["RAM held by all of an app's processes together (approximate). Close asks the app to close the normal way, like pressing X. Apps without a window of their own have no Close button."] = "एक ऐप के सभी प्रोसेस की रैम मिलाकर (अनुमानित)। बंद करें दबाने पर ऐप सामान्य तरीके से बंद होता है, जैसे X दबाना। जिन ऐप्स की अपनी विंडो नहीं है उन पर यह बटन नहीं होता।",
             ["This page only reads what Windows reports. It never changes a Windows setting and closes an app only when you press Close."] = "यह पेज केवल वही दिखाता है जो विंडोज़ बताता है। कोई विंडोज़ सेटिंग नहीं बदलता, और ऐप तभी बंद करता है जब आप बंद करें दबाएँ।",
+
+            // PC Memory View: text built while the app runs ({0}, {1}… are filled in after translation)
+            ["Windows has no page file. When RAM is full, games and apps will close with an 'out of memory' error. In Windows, turn on 'Automatically manage paging file size for all drives'."] = "विंडोज़ में पेज फ़ाइल नहीं है। रैम भरने पर गेम और ऐप्स 'out of memory' एरर देकर बंद हो जाएँगे। विंडोज़ में 'Automatically manage paging file size for all drives' चालू करें।",
+            ["Apps have reserved {0} of the {1} Windows can give (RAM + page file). At the limit, games close with an 'out of memory' error. Close apps you do not need."] = "ऐप्स ने {1} में से {0} आरक्षित कर लिया है (रैम + पेज फ़ाइल)। सीमा पर पहुँचते ही गेम 'out of memory' एरर देकर बंद हो जाते हैं। जो ऐप्स नहीं चाहिए उन्हें बंद करें।",
+            ["Apps have reserved {0} of the {1} Windows can give (RAM + page file). At the limit, games close with an 'out of memory' error. Close apps you do not need. The page file has a fixed size; set it back to 'Automatically manage' so Windows can grow it."] = "ऐप्स ने {1} में से {0} आरक्षित कर लिया है (रैम + पेज फ़ाइल)। सीमा पर पहुँचते ही गेम 'out of memory' एरर देकर बंद हो जाते हैं। जो ऐप्स नहीं चाहिए उन्हें बंद करें। पेज फ़ाइल का आकार तय (fixed) है; इसे वापस 'Automatically manage' पर करें ताकि विंडोज़ इसे बढ़ा सके।",
+            ["RAM is almost full: only {0} of {1} is free. When RAM runs out, Windows uses the page file on the SSD, which is far slower and makes games stutter. Close apps from the list before you play."] = "रैम लगभग भर गई है: {1} में से केवल {0} खाली है। रैम खत्म होने पर विंडोज़ एसएसडी की पेज फ़ाइल इस्तेमाल करता है, जो बहुत धीमी है और गेम अटकता है। खेलने से पहले सूची से ऐप्स बंद करें।",
+            ["RAM is getting low: {0} of {1} is free ({2}). Close apps you do not need before you play."] = "रैम कम हो रही है: {1} में से {0} खाली है ({2})। खेलने से पहले जो ऐप्स नहीं चाहिए उन्हें बंद करें।",
+            ["Only {0} free on {1}. Windows needs space there to grow the page file. Keep at least {2} free."] = "{1} पर केवल {0} खाली है। पेज फ़ाइल बढ़ाने के लिए विंडोज़ को वहाँ जगह चाहिए। कम से कम {2} खाली रखें।",
+            ["Only {0} free on {1}. Windows needs space there to grow the page file, and the Cloud-SSD cache uses the same drive. Keep at least {2} free."] = "{1} पर केवल {0} खाली है। पेज फ़ाइल बढ़ाने के लिए विंडोज़ को वहाँ जगह चाहिए, और Cloud-SSD का कैश भी इसी ड्राइव पर है। कम से कम {2} खाली रखें।",
+            ["Memory looks healthy: {0} of RAM is free."] = "मेमोरी ठीक है: {0} रैम खाली है।",
+            ["Windows did not report memory figures."] = "विंडोज़ ने मेमोरी की जानकारी नहीं दी।",
+            ["Last run {0}: moved {1} idle app(s) out of RAM, free RAM {2} → {3}."] = "पिछली बार {0}: {1} बेकार पड़े ऐप रैम से हटाए, खाली रैम {2} → {3}।",
+            ["Still below {0} free: the apps you are using need the RAM, so auto mode waits longer before it tries again. Close an app from the list to free more."] = "अभी भी {0} से कम खाली है: जो ऐप्स आप इस्तेमाल कर रहे हैं उन्हें रैम चाहिए, इसलिए ऑटो मोड अगली कोशिश से पहले ज़्यादा देर रुकेगा। और रैम खाली करने के लिए सूची से कोई ऐप बंद करें।",
+            ["Auto mode is off."] = "ऑटो मोड बंद है।",
+            ["Watching: {0} of RAM is free, auto mode acts below {1}."] = "नज़र रख रहा है: {0} रैम खाली है, ऑटो मोड {1} से कम पर चलेगा।",
+            ["RAM is low ({0} free); auto mode can act in {1} min."] = "रैम कम है ({0} खाली); ऑटो मोड {1} मिनट में चल सकता है।",
+            ["RAM is low ({0} free); auto mode is acting now."] = "रैम कम है ({0} खाली); ऑटो मोड अभी चल रहा है।",
+            ["Auto mode is already running."] = "ऑटो मोड पहले से चल रहा है।",
+            ["No idle background app to move: everything open was used in the last few minutes or belongs to Windows."] = "हटाने के लिए कोई बेकार पड़ा बैकग्राउंड ऐप नहीं है: जो भी खुला है वह अभी-अभी इस्तेमाल हुआ है या विंडोज़ का है।",
+            ["Moved {0} idle app(s) out of RAM. Free RAM went from {1} to {2}."] = "{0} बेकार पड़े ऐप रैम से हटाए। खाली रैम {1} से {2} हो गई।",
+            ["Close {0}?\n\nCloud Drive asks it to close the normal way, like pressing X. If it asks you to save your work, answer it — unsaved work can be lost."] = "{0} बंद करें?\n\nCloud Drive इसे सामान्य तरीके से बंद होने को कहता है, जैसे X दबाना। अगर यह काम सेव करने को पूछे तो जवाब दें — बिना सेव किया काम खो सकता है।",
+            ["{0} has no window Cloud Drive can close. Close it yourself or use Task Manager."] = "{0} की कोई विंडो नहीं है जिसे Cloud Drive बंद कर सके। इसे खुद बंद करें या Task Manager इस्तेमाल करें।",
+            ["{0} was asked to close but is still running. It may be waiting for you to save."] = "{0} को बंद होने को कहा गया पर यह अभी भी चल रहा है। शायद यह आपके सेव करने का इंतज़ार कर रहा है।",
+            ["{0} closed. Free RAM went from {1} to {2}."] = "{0} बंद हो गया। खाली रैम {1} से {2} हो गई।",
+            ["Could not open the Windows settings: {0}"] = "विंडोज़ सेटिंग्स नहीं खुल पाईं: {0}",
+            ["{0} in use"] = "{0} उपयोग में",
+            ["of {0} · {1}"] = "{0} में से · {1}",
+            ["of {0} limit (RAM + page file)"] = "सीमा {0} (रैम + पेज फ़ाइल)",
+            ["None"] = "नहीं है",
+            ["File"] = "फ़ाइल",
+            ["Size"] = "आकार",
+            ["In use"] = "उपयोग में",
+            ["Free on {0}"] = "{0} पर खाली",
+            ["{0} · sized by Windows"] = "{0} · विंडोज़ खुद तय करता है",
+            ["{0} · fixed size"] = "{0} · तय आकार",
+            ["{0} · peak {1}"] = "{0} · सबसे ज़्यादा {1}",
+            ["{0} · shared with the Cloud-SSD cache"] = "{0} · Cloud-SSD कैश भी इसी पर है",
+            ["{0} ({1} processes)"] = "{0} ({1} प्रोसेस)",
+            ["Windows and Cloud-SSD ({0} processes) — cannot be closed"] = "विंडोज़ और Cloud-SSD ({0} प्रोसेस) — बंद नहीं हो सकते",
 
             // Settings View
             ["Network"] = "नेटवर्क सेटिंग्स",

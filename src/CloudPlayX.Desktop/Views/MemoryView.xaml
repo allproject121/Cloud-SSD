@@ -15,6 +15,18 @@
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
 
+            <!-- Auto mode -->
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Content="Run now" Command="{Binding RunReliefCommand}" Margin="16,0,0,0" VerticalAlignment="Center" />
+                        <CheckBox Content="Auto mode: when less than 30% of RAM is free, move idle background apps out of RAM" IsChecked="{Binding AutoRelief}" VerticalAlignment="Center" />
+                    </DockPanel>
+                    <TextBlock Text="{Binding ReliefStatus}" TextWrapping="Wrap" Margin="0,8,0,0" Foreground="{Binding ReliefTone, Converter={StaticResource Tone}}" />
+                    <TextBlock Text="Nothing is closed and nothing is lost. A moved app is a little slow the next time you open it. Apps you used in the last 15 minutes, a running game, Windows and Cloud-SSD are left alone." Style="{StaticResource Caption}" Margin="0,6,0,0" />
+                </StackPanel>
+            </Border>
+
             <!-- KPI row -->
             <UniformGrid Columns="4">
                 <Border Style="{StaticResource Card}">
@@ -43,7 +55,7 @@
                 </Border>
                 <Border Style="{StaticResource Card}">
                     <StackPanel>
-                        <TextBlock Text="RESERVED BY APPS (COMMIT)" Style="{StaticResource Label}" />
+                        <TextBlock Text="RESERVED BY APPS" Style="{StaticResource Label}" />
                         <TextBlock Text="{Binding Commit}">
                             <TextBlock.Style>
                                 <Style TargetType="TextBlock" BasedOn="{StaticResource Metric}">
@@ -120,7 +132,7 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
-                    <TextBlock Text="RAM held by all of an app's processes together (approximate). Close asks the app to close the normal way, like pressing X; Windows and Cloud-SSD processes have no Close button." Style="{StaticResource Caption}" Margin="0,8,0,0" />
+                    <TextBlock Text="RAM held by all of an app's processes together (approximate). Close asks the app to close the normal way, like pressing X. Apps without a window of their own have no Close button." Style="{StaticResource Caption}" Margin="0,8,0,0" />
                 </StackPanel>
             </Border>
             <TextBlock Style="{StaticResource Caption}" Margin="2,0,14,0"

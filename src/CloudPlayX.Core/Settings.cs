@@ -20,6 +20,7 @@ public sealed class AppSettings
     public string? LocalGamesRoot { get; set; }
     public MobileBridgeSettings MobileBridge { get; set; } = new();
     public SmartOffloadSettings SmartOffload { get; set; } = new();
+    public MemorySettings Memory { get; set; } = new();
 }
 
 public sealed class CacheSettings
@@ -168,6 +169,12 @@ public sealed class SmartOffloadSettings
     public bool EvictVfsCacheOnLowSpace { get; set; } = true;
     public DateTimeOffset? LastOffloadTime { get; set; }
     public long TotalBytesOffloaded { get; set; }
+}
+
+public sealed class MemorySettings
+{
+    /// <summary>PC Memory auto mode: when RAM runs low, idle background apps are moved out of RAM.</summary>
+    public bool AutoRelief { get; set; } = true;
 }
 
 public interface ISettingsStore

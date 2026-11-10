@@ -182,11 +182,17 @@ public sealed class AppHost : IAsyncDisposable
         if (Rclone is null) return;
         try
         {
-            Remotes = await RcloneConfig.ListRemotesAsync(Rclone, ct);
-            foreach (var r in Remotes) _remoteTypes[r.Name] = r.Type;
+            var listed = await RcloneConfig.ListRemotesAsync(Rclone, ct);
             var dump = await RcloneConfig.DumpAsync(Rclone, ct);
+            // rclone refuses a union of one account, so with a single account the "All Accounts" remote is an alias of
+            // that account (see CombinedRemoteSpec). Everywhere else it is treated as what it stands for: a combined
+            // drive of one account, not an extra account.
+            var solo = RcloneConfigService.Aliases(dump).FirstOrDefault(a => a.Name == CombinedRemote);
+            Remotes = listed.Select(r => r.Name == CombinedRemote && r.Type == "alias" ? r with { Type = "union" } : r).ToList();
+            foreach (var r in Remotes) _remoteTypes[r.Name] = r.Type;
             SharedClientRemotes = RcloneConfigService.SharedClientDriveRemotes(dump);
             Unions = RcloneConfigService.Unions(dump).Concat(RcloneConfigService.Combines(dump))
+                .Concat(solo.Name != null ? new[] { (Name: solo.Name, Upstreams: solo.Target) } : [])
                 .ToDictionary(u => u.Name, u => RcloneConfigService.UpstreamRemotes(u.Upstreams));
             // Forget accounts that were disconnected; newly connected ones appear after RefreshAccountsAsync.
             Accounts = Accounts.Where(a => Remotes.Any(r => r.Name == a.Key)).ToDictionary(a => a.Key, a => a.Value);
@@ -295,14 +301,17 @@ public sealed class AppHost : IAsyncDisposable
             return;
         }
 
-        // Read-only sign-ins are shown in the joined drive but never chosen for new files (":ro").
-        var unionUpstreams = string.Join(' ', accounts.Select(r => r.Name + (readOnly.Contains(r.Name) ? "::ro" : ":")));
+        var combined = CombinedRemoteSpec(accounts.Select(r => r.Name).ToList(), readOnly);
         var combineUpstreams = string.Join(' ', accounts.Select(r => $"{FolderName(AccountName(r.Name))}={r.Name}:"));
-        var unionChanged = RcloneConfigService.Unions(dump).FirstOrDefault(u => u.Name == CombinedRemote).Upstreams != unionUpstreams;
+        var combinedNow = combined.Type == "alias"
+            ? RcloneConfigService.Aliases(dump).FirstOrDefault(a => a.Name == CombinedRemote).Target
+            : RcloneConfigService.Unions(dump).FirstOrDefault(u => u.Name == CombinedRemote).Upstreams;
+        var unionChanged = combinedNow != combined.Value;
         var combineChanged = RcloneConfigService.Combines(dump).FirstOrDefault(u => u.Name == SingleRemote).Upstreams != combineUpstreams;
         if (unionChanged)
-            await RcloneConfig.WriteRemoteAsync(rclone, CombinedRemote, "union",
-                [("upstreams", unionUpstreams), ("action_policy", "epmfs"), ("create_policy", "mfs"), ("search_policy", "ff")], ct);
+            await RcloneConfig.WriteRemoteAsync(rclone, CombinedRemote, combined.Type, combined.Type == "alias"
+                ? [(combined.Key, combined.Value)]
+                : [(combined.Key, combined.Value), ("action_policy", "epmfs"), ("create_policy", "mfs"), ("search_policy", "ff")], ct);
         if (combineChanged)
             await RcloneConfig.WriteRemoteAsync(rclone, SingleRemote, "combine", [("upstreams", combineUpstreams)], ct);
         await RefreshRemotesAsync(ct);
@@ -334,6 +343,16 @@ public sealed class AppHost : IAsyncDisposable
         StateChanged?.Invoke();
         _ = RefreshAccountsAsync(CancellationToken.None); // sizes of the two drives themselves
     }
+
+    /// <summary>
+    /// How the remote behind "All Accounts" is defined. Several accounts are joined by a union; read-only sign-ins
+    /// are shown in it but never chosen for new files (":ro"). rclone refuses a union of a single account ("union
+    /// can't point to a single upstream"), so one account is exposed through an alias of that account instead.
+    /// </summary>
+    public static (string Type, string Key, string Value) CombinedRemoteSpec(IReadOnlyList<string> accounts, IReadOnlyCollection<string> readOnly) =>
+        accounts.Count == 1
+            ? ("alias", "remote", accounts[0] + ":")
+            : ("union", "upstreams", string.Join(' ', accounts.Select(a => a + (readOnly.Contains(a) ? "::ro" : ":"))));
 
     private MountDefinition StandardDrive(string id, string displayName, string remote, char preferredLetter)
     {
