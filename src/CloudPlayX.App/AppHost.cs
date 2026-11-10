@@ -252,7 +252,7 @@ public sealed class AppHost : IAsyncDisposable
     /// Any other cloud drive (one letter per account, the same account mounted twice) is disconnected and removed,
     /// and the same Gmail signed in twice is kept once. Only local logins and drive entries change — never cloud files.
     /// </summary>
-    public async Task SyncStandardDrivesAsync(CancellationToken ct = default)
+    public async Task SyncStandardDrivesAsync(CancellationToken ct = default, bool removeUnfinishedLogins = false)
     {
         if (Rclone is not { } rclone) return;
         if (CurrentLaunch is { State: LaunchState.Running } l)
@@ -262,6 +262,14 @@ public sealed class AppHost : IAsyncDisposable
         // Entries without a type are leftovers of removed accounts; they must not show up as accounts.
         foreach (var broken in Remotes.Where(r => string.IsNullOrWhiteSpace(r.Type)).ToList())
             await RcloneConfig.DeleteRemoteAsync(rclone, broken.Name, ct);
+        // At startup also Google entries that never finished signing in (the app was closed in the middle of a
+        // sign-in): joined into the drives they would break them. Not while running, when a sign-in may be under way.
+        if (removeUnfinishedLogins)
+            foreach (var half in RcloneConfigService.DriveRemotesWithoutLogin(await RcloneConfig.DumpAsync(rclone, ct)))
+            {
+                _log.LogInformation("Removing unfinished sign-in {Remote}", half);
+                await RcloneConfig.DeleteRemoteAsync(rclone, half, ct);
+            }
         await RefreshRemotesAsync(ct);
         await RefreshAccountsAsync(ct, TimeSpan.FromSeconds(30));
         var dump = await RcloneConfig.DumpAsync(rclone, ct);

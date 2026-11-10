@@ -63,6 +63,21 @@ public class GoogleKeyTests
     }
 
     [Fact]
+    public void A_sign_in_that_never_finished_is_recognised_as_not_an_account()
+    {
+        // What is left when the app closes while Google's sign-in page is still open: the entry exists, the login does not.
+        var dump = JsonNode.Parse("""
+            {
+              "gdrive":  { "type": "drive", "scope": "drive", "client_id": "1-x.apps.googleusercontent.com", "token": "{\"access_token\":\"a\"}" },
+              "gdrive2": { "type": "drive", "scope": "drive", "client_id": "1-x.apps.googleusercontent.com" },
+              "sa":      { "type": "drive", "service_account_file": "C:\\sa.json" },
+              "od":      { "type": "onedrive" }
+            }
+            """)!.AsObject();
+        Assert.Equal(["gdrive2"], RcloneConfigService.DriveRemotesWithoutLogin(dump));
+    }
+
+    [Fact]
     public void Remotes_Using_Does_Not_Match_Name_Prefixes()
     {
         // "Drive10" must not be treated as used by anything that references "Drive1:".

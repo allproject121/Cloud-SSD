@@ -136,6 +136,15 @@ public sealed class RcloneConfigService
             .Select(u => u.Contains('=') ? u[(u.IndexOf('=') + 1)..] : u)
             .Where(u => u.IndexOf(':') > 0).Select(u => u[..u.IndexOf(':')]).ToList();
 
+    /// <summary>
+    /// Google Drive entries that were created but never finished signing in (no token, no service account) — what
+    /// is left when the app closes in the middle of a sign-in. They are not accounts and cannot be mounted.
+    /// </summary>
+    public static IReadOnlyList<string> DriveRemotesWithoutLogin(JsonObject dump) =>
+        dump.Where(kv => kv.Value is JsonObject o && Str(o, "type") == "drive" && Str(o, "token") == ""
+                         && Str(o, "service_account_file") == "" && Str(o, "service_account_credentials") == "")
+            .Select(kv => kv.Key).ToList();
+
     /// <summary>Alias remotes with the remote they stand for ("gdrive:").</summary>
     public static IReadOnlyList<(string Name, string Target)> Aliases(JsonObject dump) =>
         dump.Where(kv => kv.Value is JsonObject o && Str(o, "type") == "alias")
@@ -305,24 +314,26 @@ public sealed class GoogleDriveConnector
             parameters,
             opt = new { nonInteractive = true, obscure = false }
         }, ct);
-        await AnswerQuestionsAsync(rc, req.RemoteName, node, new()
-        {
-            // rclone >= 1.75 warns that its shared client is being retired; the user chose it explicitly.
-            ["config_shared_client_id"] = req.UsesSharedClient ? "true" : "false",
-        }, progress, ct);
-
-        // Verify the token works with a cheap metadata call.
-        progress?.Report("Verifying access to Google Drive…");
         try
         {
+            await AnswerQuestionsAsync(rc, req.RemoteName, node, new()
+            {
+                // rclone >= 1.75 warns that its shared client is being retired; the user chose it explicitly.
+                ["config_shared_client_id"] = req.UsesSharedClient ? "true" : "false",
+            }, progress, ct);
+
+            // Verify the token works with a cheap metadata call.
+            progress?.Report("Verifying access to Google Drive…");
             var about = await rc.CallAsync("operations/about", new { fs = req.RemoteName + ":" }, ct, TimeSpan.FromMinutes(1));
             _log.LogInformation("Google Drive connected: quota total={Total} used={Used}", about["total"]?.ToString(), about["used"]?.ToString());
         }
-        catch (RcException e)
+        catch (Exception e)
         {
-            // Do not leave a half-working login behind.
+            // Cancelled, timed out or refused: never leave an account behind that has no working login. Such an
+            // entry would be picked up as an account and break the drives that join all accounts.
             try { await rc.CallAsync("config/delete", new { name = req.RemoteName }, CancellationToken.None, TimeSpan.FromSeconds(10)); } catch (Exception) { }
-            throw GoogleSetupException.From(e.Message) ?? (Exception)e;
+            if (e is RcException rce) throw GoogleSetupException.From(rce.Message) ?? (Exception)rce;
+            throw;
         }
     }
 
