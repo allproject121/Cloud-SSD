@@ -1,7 +1,10 @@
 <resources>
-    <style name="Theme.CloudSSD" parent="android:Theme.Material.NoActionBar">
+    <!-- Light by default; values-night/ has the dark one. The page follows the same choice. -->
+    <style name="Theme.CloudSSD" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">@color/background</item>
         <item name="android:statusBarColor">@color/background</item>
         <item name="android:navigationBarColor">@color/background</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
     </style>
 </resources>

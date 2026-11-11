@@ -17,14 +17,14 @@ powershell -ExecutionPolicy Bypass -File installer/fetch-rclone.ps1
 ```
 
 ```bash
-dotnet build CloudPlayX.slnx -c Release
+dotnet build CloudSSD.slnx -c Release
 ```
 
 ```bash
-dotnet test tests/CloudPlayX.Tests
+dotnet test tests/CloudSSD.Tests
 ```
 
-Integration tests (`tests/CloudPlayX.IntegrationTests`) mount real drives and take several minutes. Please run them
+Integration tests (`tests/CloudSSD.IntegrationTests`) mount real drives and take several minutes. Please run them
 when you change mounting, caching or streaming code, and include the results in your pull request.
 
 To build the installer (`dist/CloudPlayX-<version>-setup.exe`), install Inno Setup 6

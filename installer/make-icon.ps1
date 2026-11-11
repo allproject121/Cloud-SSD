@@ -1,5 +1,5 @@
-﻿# Generates Assets\cloudplayx.ico (16-256 px PNG frames) for the Cloud-SSD desktop app.
-param([string]$Out = "$PSScriptRoot\..\src\CloudPlayX.Desktop\Assets\cloudplayx.ico")
+﻿# Generates Assets\cloudssd.ico (16-256 px PNG frames) for the Cloud-SSD desktop app.
+param([string]$Out = "$PSScriptRoot\..\src\CloudSSD.Desktop\Assets\cloudssd.ico")
 Add-Type -AssemblyName System.Drawing
 
 function New-Frame([int]$s) {

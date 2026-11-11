@@ -5,11 +5,11 @@ Cloud-SSD runs games on the user's own PC from files stored in cloud storage. It
 telemetry, prediction, game management and a desktop UI. No kernel driver and no second cache layer.
 
 ```
- ┌────────────────────────── CloudPlayX.Desktop (WPF, MVVM) ─────────────────────────┐   cpx.exe (CLI)
+ ┌────────────────────────── CloudSSD.Desktop (WPF, MVVM) ─────────────────────────┐   cpx.exe (CLI)
  │ Dashboard · Cloud Drives · Game Library · Accelerator · Smart Cache · Perf · ...   │   benchmarks
  └───────────────────────────────────────┬────────────────────────────────────────────┘        │
                                          ▼                                                     ▼
- ┌──────────────────────────────── CloudPlayX.App: AppHost ──────────────────────────────────────┐
+ ┌──────────────────────────────── CloudSSD.App: AppHost ──────────────────────────────────────┐
  │ settings · rclone discovery · mounts ⇄ engine wiring · metrics (1 Hz) · disk guard · games     │
  └──────┬──────────────┬────────────────┬───────────────────┬──────────────────┬──────────────────┘
         ▼              ▼                ▼                   ▼                  ▼
@@ -32,17 +32,17 @@ telemetry, prediction, game management and a desktop UI. No kernel driver and no
 
 | Project | Responsibility |
 |---|---|
-| `CloudPlayX.Core` | Settings (atomic JSON), paths, units (Mbps vs MB/s), models, metric history, disk P/Invoke (sparse physical size, free space, filesystem), read-attribution registry |
-| `CloudPlayX.Diagnostics` | Logging (file + in-memory, redacted), `Redactor`, DPAPI `SecretStore`, WinFsp/dependency checks, sanitized diagnostic ZIP |
-| `CloudPlayX.Mount` | rclone discovery + capability detection (parses `mount --help`/`help flags`), argument-list runner, rc client, private config + encryption, Google Drive OAuth connector (rc `config/create` state machine), mount flag builder, drive letters, `RcloneMountService` (start/ready/health/crash-restart/graceful unmount/adoption), rotation-safe `LogTailer`, `RcloneLogParser` |
-| `CloudPlayX.Cache` | `CacheInspector` (reads rclone `vfsMeta` range lists + `GetCompressedFileSizeW`), `DiskSafetyGuard` (budget vs. reserve, overrun margin, pressure), `CacheMaintenance` (marker-guarded clearing), `CacheIndex` |
-| `CloudPlayX.Streaming` | Prediction engine: predictors, accounting, `PrefetchQueue`, `NetworkGovernor`, `SchedulingPolicy`, `PrefetchScheduler`, `MountReadExecutor`, `ProfileStore`, `StreamingEngine`, Game-Aware mode, deterministic simulator + synthetic traces |
-| `CloudPlayX.Games` | Library, scanner, PE inspector, dependency resolver, compatibility analyzer, Hybrid builder, Full Local installer, launcher (job objects, NTSTATUS decoding, event log), network probe, Optimize & Prepare, pin keeper |
-| `CloudPlayX.Providers` | Provider descriptors and support levels (Google Drive supported; others via rclone untested; TeraBox unsupported) |
-| `CloudPlayX.App` | `AppHost` application service and `MetricsCollector` |
-| `CloudPlayX.Desktop` | WPF UI (MVVM with CommunityToolkit), theme, `Sparkline` chart, dialogs |
-| `CloudPlayX.Cli` | `cpx` CLI; also rclone's `--password-command` helper for DPAPI-protected config encryption |
-| `CloudPlayX.SimCloud` | Throttled local HTTP file server for tests/benchmarks (bandwidth, latency, failures, drops, offline) |
+| `CloudSSD.Core` | Settings (atomic JSON), paths, units (Mbps vs MB/s), models, metric history, disk P/Invoke (sparse physical size, free space, filesystem), read-attribution registry |
+| `CloudSSD.Diagnostics` | Logging (file + in-memory, redacted), `Redactor`, DPAPI `SecretStore`, WinFsp/dependency checks, sanitized diagnostic ZIP |
+| `CloudSSD.Mount` | rclone discovery + capability detection (parses `mount --help`/`help flags`), argument-list runner, rc client, private config + encryption, Google Drive OAuth connector (rc `config/create` state machine), mount flag builder, drive letters, `RcloneMountService` (start/ready/health/crash-restart/graceful unmount/adoption), rotation-safe `LogTailer`, `RcloneLogParser` |
+| `CloudSSD.Cache` | `CacheInspector` (reads rclone `vfsMeta` range lists + `GetCompressedFileSizeW`), `DiskSafetyGuard` (budget vs. reserve, overrun margin, pressure), `CacheMaintenance` (marker-guarded clearing), `CacheIndex` |
+| `CloudSSD.Streaming` | Prediction engine: predictors, accounting, `PrefetchQueue`, `NetworkGovernor`, `SchedulingPolicy`, `PrefetchScheduler`, `MountReadExecutor`, `ProfileStore`, `StreamingEngine`, Game-Aware mode, deterministic simulator + synthetic traces |
+| `CloudSSD.Games` | Library, scanner, PE inspector, dependency resolver, compatibility analyzer, Hybrid builder, Full Local installer, launcher (job objects, NTSTATUS decoding, event log), network probe, Optimize & Prepare, pin keeper |
+| `CloudSSD.Providers` | Provider descriptors and support levels (Google Drive supported; others via rclone untested; TeraBox unsupported) |
+| `CloudSSD.App` | `AppHost` application service and `MetricsCollector` |
+| `CloudSSD.Desktop` | WPF UI (MVVM with CommunityToolkit), theme, `Sparkline` chart, dialogs |
+| `CloudSSD.Cli` | `cpx` CLI; also rclone's `--password-command` helper for DPAPI-protected config encryption |
+| `CloudSSD.SimCloud` | Throttled local HTTP file server for tests/benchmarks (bandwidth, latency, failures, drops, offline) |
 
 ## Key data flows
 

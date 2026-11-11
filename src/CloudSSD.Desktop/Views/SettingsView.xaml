@@ -1,0 +1,150 @@
+<UserControl x:Class="CloudSSD.Desktop.Views.SettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="clr-namespace:CloudSSD.Desktop.Views">
+    <UserControl.Resources>
+        <Style x:Key="Field" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+            <Setter Property="Width" Value="140" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="Margin" Value="0,0,0,12" />
+        </Style>
+    </UserControl.Resources>
+    <Grid Margin="0,0,14,20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Phone-style Settings Category Selector Strip -->
+        <Border Grid.Row="0" Background="{StaticResource Surface}" CornerRadius="12" Padding="6" Margin="0,0,0,14" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                <Button Content="⚙️ General" Command="{Binding SwitchSubTabCommand}" CommandParameter="General" Margin="2,0">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource ButtonBase}">
+                            <Setter Property="Background" Value="Transparent" />
+                            <Setter Property="Foreground" Value="{StaticResource Dim}" />
+                            <Setter Property="BorderThickness" Value="0" />
+                            <Setter Property="Padding" Value="16,8" />
+                            <Setter Property="FontWeight" Value="SemiBold" />
+                            <Setter Property="FontSize" Value="13" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ActiveTab}" Value="General">
+                                    <Setter Property="Background" Value="{StaticResource Accent}" />
+                                    <Setter Property="Foreground" Value="White" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+                <Button Content="⚡ Speed &amp; Fast Load" Command="{Binding SwitchSubTabCommand}" CommandParameter="Speed" Margin="2,0">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource ButtonBase}">
+                            <Setter Property="Background" Value="Transparent" />
+                            <Setter Property="Foreground" Value="{StaticResource Dim}" />
+                            <Setter Property="BorderThickness" Value="0" />
+                            <Setter Property="Padding" Value="16,8" />
+                            <Setter Property="FontWeight" Value="SemiBold" />
+                            <Setter Property="FontSize" Value="13" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ActiveTab}" Value="Speed">
+                                    <Setter Property="Background" Value="{StaticResource Accent}" />
+                                    <Setter Property="Foreground" Value="White" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+                <Button Content="📊 Performance" Command="{Binding SwitchSubTabCommand}" CommandParameter="Performance" Margin="2,0">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource ButtonBase}">
+                            <Setter Property="Background" Value="Transparent" />
+                            <Setter Property="Foreground" Value="{StaticResource Dim}" />
+                            <Setter Property="BorderThickness" Value="0" />
+                            <Setter Property="Padding" Value="16,8" />
+                            <Setter Property="FontWeight" Value="SemiBold" />
+                            <Setter Property="FontSize" Value="13" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ActiveTab}" Value="Performance">
+                                    <Setter Property="Background" Value="{StaticResource Accent}" />
+                                    <Setter Property="Foreground" Value="White" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+                <Button Content="🛠️ Advanced &amp; Logs" Command="{Binding SwitchSubTabCommand}" CommandParameter="Advanced" Margin="2,0">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource ButtonBase}">
+                            <Setter Property="Background" Value="Transparent" />
+                            <Setter Property="Foreground" Value="{StaticResource Dim}" />
+                            <Setter Property="BorderThickness" Value="0" />
+                            <Setter Property="Padding" Value="16,8" />
+                            <Setter Property="FontWeight" Value="SemiBold" />
+                            <Setter Property="FontSize" Value="13" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ActiveTab}" Value="Advanced">
+                                    <Setter Property="Background" Value="{StaticResource Accent}" />
+                                    <Setter Property="Foreground" Value="White" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+            </StackPanel>
+        </Border>
+
+        <!-- SubTab 1: General Settings (shown when ActiveTab == "General") -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <ScrollViewer.Style>
+                <Style TargetType="ScrollViewer">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding ActiveTab}" Value="General">
+                            <Setter Property="Visibility" Value="Visible" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </ScrollViewer.Style>
+            <StackPanel Margin="0,0,0,20">
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
+                    <Button Style="{StaticResource Primary}" Content="Save Settings" Command="{Binding SaveCommand}" />
+                    <Button Content="Open Data Folder" Command="{Binding OpenDataFolderCommand}" />
+                </StackPanel>
+                <UniformGrid Columns="2">
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="Startup and Connection" Style="{StaticResource H2}" />
+                            <CheckBox Content="Auto-reconnect drives on startup" IsChecked="{Binding RestoreMounts}" Margin="0,6" />
+                            <CheckBox Content="Keep drives connected after closing (default answer)" IsChecked="{Binding KeepMounts}" Margin="0,6" />
+                            <CheckBox Content="Encrypt the connection config (protected with Windows DPAPI)" IsChecked="{Binding EncryptConfig}" Margin="0,6" />
+                            <TextBlock Text="DATA STORAGE FOLDER" Style="{StaticResource Label}" Margin="0,16,0,4" />
+                            <TextBlock Text="{Binding DataRoot}" FontFamily="{StaticResource MonoFont}" FontSize="12" Foreground="{StaticResource Muted}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="Games &amp; Downloads Directory" Style="{StaticResource H2}" />
+                            <TextBlock Text="LOCAL GAMES FOLDER (Hybrid and Full Local modes)" Style="{StaticResource Label}" Margin="0,6,0,4" />
+                            <TextBox Text="{Binding LocalGamesRoot, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,12" />
+                            <TextBlock Style="{StaticResource Caption}" Text="Games downloaded or installed locally will be organized in this directory." />
+                        </StackPanel>
+                    </Border>
+                </UniformGrid>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- SubTabs 2, 3, 4, 5: Rendered dynamically via ContentControl based on CurrentContent -->
+        <ContentControl Grid.Row="1" Content="{Binding CurrentContent}">
+            <ContentControl.Style>
+                <Style TargetType="ContentControl">
+                    <Setter Property="Visibility" Value="Visible" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding ActiveTab}" Value="General">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </ContentControl.Style>
+        </ContentControl>
+    </Grid>
+</UserControl>

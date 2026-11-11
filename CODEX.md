@@ -16,7 +16,7 @@
 | Attribute | Specification |
 |---|---|
 | **Official Name** | **Cloud-SSD** |
-| **Solution** | `CloudPlayX.slnx` |
+| **Solution** | `CloudSSD.slnx` |
 | **Framework** | .NET 10 (`net10.0-windows10.0.19041.0` / `net10.0`) |
 | **Language** | C# (Latest, Nullable enabled) |
 | **GUI Framework** | WPF (.NET 10) + CommunityToolkit.Mvvm |
@@ -33,50 +33,50 @@
 
 Codex built and structured the 11 core sub-projects:
 
-### 1. `CloudPlayX.Core`
+### 1. `CloudSSD.Core`
 - **Domain Models & Settings**: Atomic JSON configuration (`settings.json`).
 - **Paths & Units**: Resolves `%LOCALAPPDATA%\Cloud-SSD` as primary data root, units conversion (Mbps vs MB/s).
 - **Disk Utilities**: Win32 P/Invoke for `GetCompressedFileSizeW` to track physical allocation of sparse files on NTFS.
 
-### 2. `CloudPlayX.Mount`
+### 2. `CloudSSD.Mount`
 - **Virtual Drive Supervisor**: Manages `rclone mount` child process with WinFsp user-mode driver.
 - **Remote Control & Tailer**: Non-locking `-vv` log tailer (`LogTailer`) parsing real-time block access events.
 - **Crash Recovery & Re-attach**: Auto-restart on crash and re-attachment to orphaned mounts.
 
-### 3. `CloudPlayX.Cache`
+### 3. `CloudSSD.Cache`
 - **Smart Cache Inspector**: Tracks `.vfsMeta` range tables and actual cluster allocation.
 - **DiskSafetyGuard**: Protects system disk free space (enforces minimum free reserve, pauses prefetch on pressure).
 - **Marker-Guarded Eviction**: Safe cleanup protecting cloud originals and game saves (`.cloudplayx-cache`).
 
-### 4. `CloudPlayX.Streaming`
+### 4. `CloudSSD.Streaming`
 - **Prediction Engine**: `StartupPredictor` (boot profiles), `SequentialPredictor` (linear reads).
 - **Priority Scheduler**: P0 (active game read, direct rclone path) yields no contention to P1–P3 prefetch reads.
 - **Bandwidth Governance**: Dynamic throttling based on network delay and available capacity.
 
-### 5. `CloudPlayX.Games`
+### 5. `CloudSSD.Games`
 - **Scanner & PE Inspector**: Reads Portable Executable (PE) headers and imports to detect missing VC++ / DirectX dependencies.
 - **Compatibility Analyzer**: Detects anti-cheat engines (EasyAntiCheat, BattlEye, Vanguard) and DRM systems.
 - **Sandbox Launcher**: Spawns games in Windows Job Objects and decodes NTSTATUS exit codes.
 
-### 6. `CloudPlayX.Desktop`
+### 6. `CloudSSD.Desktop`
 - **Modern WPF GUI**: MVVM pattern via `CommunityToolkit.Mvvm`.
 - **Views**: Dashboard, Cloud Drives, Game Library, Accelerator, Smart Cache, Live Monitor, Diagnostics.
 - **Controls**: Lightweight custom `Sparkline` real-time graph controls.
 
-### 7. `CloudPlayX.Diagnostics`
+### 7. `CloudSSD.Diagnostics`
 - **DPAPI SecretStore**: Hardware-bound encryption for OAuth tokens.
 - **Redaction & Export**: Sanitizes personal data, paths, and tokens into diagnostic zip exports.
 
-### 8. `CloudPlayX.Providers`
+### 8. `CloudSSD.Providers`
 - Provider descriptors for Google Drive (Tier 1 supported) and generic rclone remotes.
 
-### 9. `CloudPlayX.Cli`
+### 9. `CloudSSD.Cli`
 - `cpx.exe` headless CLI for mounting, diagnostics, and testing.
 
-### 10. `CloudPlayX.SimCloud`
+### 10. `CloudSSD.SimCloud`
 - Local mock server simulating throttled cloud connections, jitter, latency, and packet drops.
 
-### 11. `CloudPlayX.App`
+### 11. `CloudSSD.App`
 - Main host orchestrator and DI wireup.
 
 ---
@@ -127,11 +127,11 @@ Codex built and structured the 11 core sub-projects:
 
 ```powershell
 # Build Solution (Release x64)
-dotnet build CloudPlayX.slnx -c Release
+dotnet build CloudSSD.slnx -c Release
 
 # Run Automated Tests
-dotnet test CloudPlayX.slnx -c Debug --logger "console;verbosity=normal"
+dotnet test CloudSSD.slnx -c Debug --logger "console;verbosity=normal"
 
 # Run Desktop UI
-dotnet run --project src/CloudPlayX.Desktop -c Release
+dotnet run --project src/CloudSSD.Desktop -c Release
 ```

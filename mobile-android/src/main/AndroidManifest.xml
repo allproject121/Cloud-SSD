@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.cloudssd.mobile"
-    android:versionCode="2"
-    android:versionName="0.8.0">
+    android:versionCode="5"
+    android:versionName="0.10.0">
 
     <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="35" />
 
@@ -17,11 +17,35 @@
     <!-- "All files access": lets the file browser show documents, APKs and every folder, like the phone's own Files app. -->
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Camera backup: keeps its schedule after the phone restarts, and keeps the place a photo was taken. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION" />
     <!-- Lets "Open" on an APK in the file browser hand it to Android's installer (which still asks the user). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- Transfers keep going when the app is closed (TransferService). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- Space & RAM: "Uninstall" hands an app to Android's own uninstall prompt; app sizes and recently used apps
+         need "Usage access", which the user turns on in Settings (the app opens that screen). -->
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" />
 
+    <!-- Apps this app may see: the launcher apps (Space & RAM's app list) and Tailscale (away from home). -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <package android:name="com.tailscale.ipn" />
+        <!-- Play on phone: the old Artemis app stays as a backup until our own stream plays as well. -->
+        <package android:name="com.limelight.noir" />
+    </queries>
+
+    <!-- No backups of the app's data: the pairing key and Google sign-ins must not leave the phone. -->
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher"
@@ -39,13 +63,22 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- Pairing link from the PC's QR page: cloudssd://pair?host=192.168.1.5:8090&token=... -->
+            <!-- Pairing link from the PC's QR page (cloudssd://pair?host=…&pair=…), and the way back after Google sign-in. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="cloudssd" android:host="pair" />
+                <data android:scheme="cloudssd" android:host="auth" />
             </intent-filter>
+            <!-- GOOGLE-REDIRECT-BEGIN: filled in by build-apk.ps1 from google-oauth.json (iOS-type key) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="GOOGLE_REDIRECT_SCHEME" />
+            </intent-filter>
+            <!-- GOOGLE-REDIRECT-END -->
             <!-- "Share" from any app sends the file(s) to the PC. -->
             <intent-filter android:label="Send to PC">
                 <action android:name="android.intent.action.SEND" />
@@ -54,5 +87,36 @@
                 <data android:mimeType="*/*" />
             </intent-filter>
         </activity>
+
+        <!-- Shows the cloud drives in the phone's Files app and in every app's Open / Save picker. -->
+        <provider
+            android:name=".CloudDocumentsProvider"
+            android:authorities="com.cloudssd.mobile.documents"
+            android:exported="true"
+            android:grantUriPermissions="true"
+            android:permission="android.permission.MANAGE_DOCUMENTS">
+            <intent-filter>
+                <action android:name="android.content.action.DOCUMENTS_PROVIDER" />
+            </intent-filter>
+        </provider>
+
+        <!-- Camera backup, run by Android in the background (see CameraBackup). -->
+        <service
+            android:name=".CameraBackupService"
+            android:exported="true"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+
+        <!-- Keeps transfers going while the app is closed (see TransferHub). -->
+        <service
+            android:name=".TransferService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+        <!-- Play on phone: the PC's game full screen, its sound, and touches back to the PC. -->
+        <activity
+            android:name=".StreamActivity"
+            android:exported="false"
+            android:screenOrientation="sensorLandscape"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|smallestScreenSize"
+            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen" />
     </application>
 </manifest>

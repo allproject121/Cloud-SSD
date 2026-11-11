@@ -14,7 +14,7 @@ jobs:
         with:
           dotnet-version: 10.0.x
       - name: Build
-        run: dotnet build CloudPlayX.slnx -c Release --nologo
+        run: dotnet build CloudSSD.slnx -c Release --nologo
       # Unit tests only: the integration tests mount real drives and need WinFsp + rclone (see TEST_REPORT.md).
       - name: Unit tests
-        run: dotnet test tests/CloudPlayX.Tests -c Release --no-build --nologo
+        run: dotnet test tests/CloudSSD.Tests -c Release --no-build --nologo

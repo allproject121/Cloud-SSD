@@ -1,14 +1,14 @@
 ﻿# Benchmarks
 
-Two kinds of benchmark, both reproducible with `benchmarks/CloudPlayX.Benchmarks`. Raw outputs (Markdown + JSON) are
+Two kinds of benchmark, both reproducible with `benchmarks/CloudSSD.Benchmarks`. Raw outputs (Markdown + JSON) are
 in `benchmarks/results/`. Nothing here is estimated or hand-edited.
 
 ```bash
-dotnet run -c Release --project benchmarks/CloudPlayX.Benchmarks -- real --mbps 70 --latency 80
+dotnet run -c Release --project benchmarks/CloudSSD.Benchmarks -- real --mbps 70 --latency 80
 ```
 
 ```bash
-dotnet run -c Release --project benchmarks/CloudPlayX.Benchmarks -- sim --scale 0.25
+dotnet run -c Release --project benchmarks/CloudSSD.Benchmarks -- sim --scale 0.25
 ```
 
 ## 1. Real end-to-end (measured)

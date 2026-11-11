@@ -37,7 +37,7 @@ if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
 
 # 2. Tests (unit tests always; integration tests need WinFsp and take several minutes).
 if (-not $SkipTests) {
-    & $dotnet test (Join-Path $repo "tests\CloudPlayX.Tests") -c $Configuration --nologo -v q
+    & $dotnet test (Join-Path $repo "tests\CloudSSD.Tests") -c $Configuration --nologo -v q
     if ($LASTEXITCODE -ne 0) { throw "Unit tests failed" }
 }
 
@@ -47,9 +47,9 @@ if (Test-Path $tempStage) { Remove-Item -Recurse -Force $tempStage }
 New-Item -ItemType Directory -Force $tempStage | Out-Null
 
 $common = @("-c", $Configuration, "-r", "win-x64", "--self-contained", "true", "-p:PublishReadyToRun=true", "-p:Version=$Version", "--nologo", "-v", "q", "-o", $tempStage)
-& $dotnet publish (Join-Path $repo "src\CloudPlayX.Desktop\CloudPlayX.Desktop.csproj") @common
+& $dotnet publish (Join-Path $repo "src\CloudSSD.Desktop\CloudSSD.Desktop.csproj") @common
 if ($LASTEXITCODE -ne 0) { throw "Desktop publish failed" }
-& $dotnet publish (Join-Path $repo "src\CloudPlayX.Cli\CloudPlayX.Cli.csproj") @common
+& $dotnet publish (Join-Path $repo "src\CloudSSD.Cli\CloudSSD.Cli.csproj") @common
 if ($LASTEXITCODE -ne 0) { throw "CLI publish failed" }
 
 Copy-Item (Join-Path $tempStage "*") $stage -Recurse -Force
@@ -82,9 +82,9 @@ foreach ($f in "README.md", "KNOWN_LIMITATIONS.md", "COMPATIBILITY.md", "BENCHMA
 }
 New-Item -ItemType Directory -Force (Join-Path $stage "docs") | Out-Null
 Copy-Item (Join-Path $repo "docs\*") (Join-Path $stage "docs") -Recurse -Force
-Copy-Item (Join-Path $PSScriptRoot "Install-CloudPlayX.ps1") $stage -Force
-Copy-Item (Join-Path $PSScriptRoot "Uninstall-CloudPlayX.ps1") $stage -Force
-Set-Content (Join-Path $stage "Install.cmd") "@echo off`r`npowershell -NoProfile -ExecutionPolicy Bypass -File `"%~dp0Install-CloudPlayX.ps1`" %*`r`npause"
+Copy-Item (Join-Path $PSScriptRoot "Install-CloudSSD.ps1") $stage -Force
+Copy-Item (Join-Path $PSScriptRoot "Uninstall-CloudSSD.ps1") $stage -Force
+Set-Content (Join-Path $stage "Install.cmd") "@echo off`r`npowershell -NoProfile -ExecutionPolicy Bypass -File `"%~dp0Install-CloudSSD.ps1`" %*`r`npause"
 Remove-Item (Join-Path $stage "*.pdb") -ErrorAction SilentlyContinue
 
 # 6. Smoke test of the published binaries (no UI): CLI must run and find rclone/WinFsp.
@@ -119,10 +119,9 @@ if ($sig.Status -ne "Valid" -or $sig.SignerCertificate.Subject -notmatch "NAVIMA
     Remove-Item $winfspMsi -Force
     throw "WinFsp installer signature check failed ($($sig.Status)); deleted it."
 }
-& $iscc /Q "/DAppVersion=$Version" "/DSourceDir=$stage" "/DWinFspMsi=$winfspMsi" "/O$dist" (Join-Path $PSScriptRoot "CloudPlayX.iss")
+& $iscc /Q "/DAppVersion=$Version" "/DSourceDir=$stage" "/DWinFspMsi=$winfspMsi" "/O$dist" (Join-Path $PSScriptRoot "CloudSSD.iss")
 if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed" }
 $setup = Join-Path $dist "Cloud-SSD-$Version-setup.exe"
 $setupHash = (Get-FileHash $setup -Algorithm SHA256).Hash.ToLower()
 Set-Content "$setup.sha256" "$setupHash  Cloud-SSD-$Version-setup.exe"
-Copy-Item $setup (Join-Path $dist "CloudPlayX-$Version-setup.exe") -Force -ErrorAction SilentlyContinue
 Write-Host "Installer: $setup ($([math]::Round((Get-Item $setup).Length / 1MB, 1)) MB)`nSHA256: $setupHash" -ForegroundColor Green

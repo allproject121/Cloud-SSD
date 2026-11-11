@@ -8,8 +8,8 @@ WinFsp 2.1.25156, rclone v1.75.2, .NET 10.0.3. Nothing was run on a clean machin
 
 | Suite | Result |
 |---|---|
-| Unit tests (`tests/CloudPlayX.Tests`) | **54 / 54 passed** (0.7.0 release build, 2026-10-12) |
-| Integration tests (`tests/CloudPlayX.IntegrationTests`, real rclone + WinFsp mounts) | **27 / 27** — final full run 26 passed, 1 failed (test-design flaw, see below), fixed and re-run: passed |
+| Unit tests (`tests/CloudSSD.Tests`) | **54 / 54 passed** (0.7.0 release build, 2026-10-12) |
+| Integration tests (`tests/CloudSSD.IntegrationTests`, real rclone + WinFsp mounts) | **27 / 27** — final full run 26 passed, 1 failed (test-design flaw, see below), fixed and re-run: passed |
 | End-to-end game flow (in the integration suite) | passed |
 | Release build + `cpx deps` smoke test in published folder | passed |
 | Install / uninstall of the release ZIP (custom folder) | passed (see notes) |
@@ -20,7 +20,7 @@ WinFsp 2.1.25156, rclone v1.75.2, .NET 10.0.3. Nothing was run on a clean machin
 ## How to reproduce
 
 ```bash
-dotnet test tests/CloudPlayX.Tests
+dotnet test tests/CloudSSD.Tests
 ```
 
 The integration suite creates a ~0.9 GB dataset under `.work/it/` on the first run. The end-to-end game test needs
@@ -35,7 +35,7 @@ powershell -Command "$g='.work/it/dataset/Games/CPX Demo Game'; New-Item -ItemTy
 ```
 
 ```bash
-dotnet test tests/CloudPlayX.IntegrationTests
+dotnet test tests/CloudSSD.IntegrationTests
 ```
 
 ## Unit tests (52)

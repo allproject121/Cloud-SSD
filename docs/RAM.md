@@ -142,7 +142,7 @@ App ke sidebar me apna alag page hai: **PC Memory (RAM)** (Game Library aur Sett
 * **Sabse zyada RAM lene wale Apps:** top 8 apps unke asli naam se. Jin apps ki apni window hai unke saamne **Band Karein** button: pehle poochta hai, phir app ko normal tareeke se band hone ko kehta hai (jaise X dabana) — zabardasti kill nahi. Windows aur Cloud-SSD ke process ek hi line me jode jate hain, un par button nahi.
 * **Game Library ➔ PLAY:** RAM 85%+ bhari ho to "started" message ke saath chetavni.
 
-Code: `src/CloudPlayX.App/MemoryHealth.cs`, `src/CloudPlayX.App/MemoryRelief.cs`, `src/CloudPlayX.Desktop/ViewModels/MemoryViewModel.cs`, `src/CloudPlayX.Desktop/Views/MemoryView.xaml` (tests: `tests/CloudPlayX.Tests/MemoryHealthTests.cs`).
+Code: `src/CloudSSD.App/MemoryHealth.cs`, `src/CloudSSD.App/MemoryRelief.cs`, `src/CloudSSD.Desktop/ViewModels/MemoryViewModel.cs`, `src/CloudSSD.Desktop/Views/MemoryView.xaml` (tests: `tests/CloudSSD.Tests/MemoryHealthTests.cs`).
 
 Jo **nahi** banaya gaya aur nahi banana chahiye: compression "tuner", ya pagefile ko apne aap 16/32 GB karne wala slider (admin rights + restart chahiye, aur cache ki jagah kha jata hai).
 

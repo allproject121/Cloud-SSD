@@ -1,4 +1,7 @@
-param()
+param(
+    # A debug build lets the page be inspected over USB (chrome://inspect); a normal build does not.
+    [switch]$Debug
+)
 $ErrorActionPreference = "Stop"
 
 $sdk = "$env:LOCALAPPDATA\Android\Sdk"
@@ -21,9 +24,55 @@ $build = Join-Path $root "build"
 
 if (Test-Path $build) { Remove-Item -Recurse -Force $build }
 New-Item -ItemType Directory -Force (Join-Path $build "compiled_res") | Out-Null
-New-Item -ItemType Directory -Force (Join-Path $build "gen") | Out-Null
+New-Item -ItemType Directory -Force (Join-Path $build "gen\com\cloudssd\mobile") | Out-Null
 New-Item -ItemType Directory -Force (Join-Path $build "classes") | Out-Null
 New-Item -ItemType Directory -Force (Join-Path $build "dex") | Out-Null
+
+# ---- Google key for "phone without the PC" (optional) ------------------------------------------------------------
+# mobile-android\google-oauth.json (never committed) holds either {"iosClientId": "...apps.googleusercontent.com"}
+# or {"desktopClientId": "...", "desktopClientSecret": "..."}. Without it, the PC's own key file
+# (installer\google-client.json, Google's "installed" format) is used as a Desktop key. With neither, the app is built
+# without Google sign-in and simply works through the PC.
+$clientId = ""; $clientSecret = ""; $redirect = ""; $mode = ""; $scheme = ""
+$oauthFile = Join-Path $root "google-oauth.json"
+$pcKeyFile = Join-Path $root "..\installer\google-client.json"
+if (Test-Path $oauthFile) {
+    $o = Get-Content -Raw $oauthFile | ConvertFrom-Json
+    if ($o.iosClientId) {
+        $clientId = $o.iosClientId.Trim(); $mode = "ios"
+        $scheme = "com.googleusercontent.apps." + ($clientId -replace '\.apps\.googleusercontent\.com$', '')
+        $redirect = "${scheme}:/oauth2redirect"
+    } elseif ($o.desktopClientId) {
+        $clientId = $o.desktopClientId.Trim(); $clientSecret = "$($o.desktopClientSecret)".Trim(); $mode = "desktop"
+    }
+} elseif (Test-Path $pcKeyFile) {
+    $o = Get-Content -Raw $pcKeyFile | ConvertFrom-Json
+    if ($o.installed.client_id) { $clientId = $o.installed.client_id; $clientSecret = "$($o.installed.client_secret)"; $mode = "desktop" }
+}
+function JavaString([string]$s) { '"' + ($s -replace '\\', '\\' -replace '"', '\"') + '"' }
+# Written without a byte-order mark: javac refuses one.
+[IO.File]::WriteAllText((Join-Path $build "gen\com\cloudssd\mobile\GoogleConfig.java"), @"
+package com.cloudssd.mobile;
+
+/** Written by build-apk.ps1 from google-oauth.json; empty when the app was built without a Google key. */
+final class GoogleConfig {
+    static final String CLIENT_ID = $(JavaString $clientId);
+    static final String CLIENT_SECRET = $(JavaString $clientSecret);
+    static final String REDIRECT = $(JavaString $redirect);
+    static final String MODE = $(JavaString $mode);
+
+    private GoogleConfig() {
+    }
+}
+"@, (New-Object Text.UTF8Encoding($false)))
+Write-Host ("Google sign-in on the phone: " + $(if ($mode) { "$mode key" } else { "not included (no google-oauth.json)" })) -ForegroundColor Cyan
+
+# The manifest with the Google redirect filled in (or that block removed).
+$manifest = Get-Content -Raw "$root\src\main\AndroidManifest.xml"
+if ($mode -eq "ios") { $manifest = $manifest.Replace("GOOGLE_REDIRECT_SCHEME", $scheme) }
+else { $manifest = [regex]::Replace($manifest, '(?s)\s*<!-- GOOGLE-REDIRECT-BEGIN.*?GOOGLE-REDIRECT-END -->', '') }
+$builtManifest = Join-Path $build "AndroidManifest.xml"
+[IO.File]::WriteAllText($builtManifest, $manifest, (New-Object Text.UTF8Encoding($false)))
 
 Write-Host "1. Compiling Android resources with AAPT2..." -ForegroundColor Cyan
 & $aapt2 compile --dir "$root\src\main\res" -o "$build\compiled_res"
@@ -31,17 +80,21 @@ if ($LASTEXITCODE -ne 0) { throw "AAPT2 compile failed" }
 
 Write-Host "2. Linking resources and generating R.java..." -ForegroundColor Cyan
 $flatFiles = Get-ChildItem "$build\compiled_res\*.flat" | ForEach-Object { $_.FullName }
-& $aapt2 link -I $jar --manifest "$root\src\main\AndroidManifest.xml" --java "$build\gen" -o "$build\app-unaligned.apk" -A "$root\src\main\assets" @flatFiles
+$linkArgs = @("link", "-I", $jar, "--manifest", $builtManifest, "--java", "$build\gen", "-o", "$build\app-unaligned.apk", "-A", "$root\src\main\assets")
+if ($Debug) { $linkArgs += "--debug-mode" }
+& $aapt2 @linkArgs @flatFiles
 if ($LASTEXITCODE -ne 0) { throw "AAPT2 link failed" }
 
 Write-Host "3. Compiling Java sources..." -ForegroundColor Cyan
 $javaSources = Get-ChildItem "$build\gen", "$root\src\main\java" -Recurse -Filter "*.java" | ForEach-Object { $_.FullName }
-& $javac -source 1.8 -target 1.8 -classpath $jar -d "$build\classes" @javaSources
+& $javac -source 1.8 -target 1.8 -encoding UTF-8 -classpath $jar -d "$build\classes" @javaSources
 if ($LASTEXITCODE -ne 0) { throw "javac failed" }
 
 Write-Host "4. Dexing classes with D8..." -ForegroundColor Cyan
-$classFiles = Get-ChildItem "$build\classes" -Recurse -Filter "*.class" | ForEach-Object { $_.FullName }
-& $d8 @classFiles --lib $jar --min-api 24 --output "$build\dex"
+# One jar instead of every .class file on the command line (Windows limits its length).
+& $jarTool -cf "$build\classes.jar" -C "$build\classes" .
+if ($LASTEXITCODE -ne 0) { throw "jar of classes failed" }
+& $d8 "$build\classes.jar" --lib $jar --min-api 24 --output "$build\dex"
 if ($LASTEXITCODE -ne 0) { throw "d8 failed" }
 
 Write-Host "5. Packaging classes.dex into APK..." -ForegroundColor Cyan
@@ -49,7 +102,7 @@ Write-Host "5. Packaging classes.dex into APK..." -ForegroundColor Cyan
 if ($LASTEXITCODE -ne 0) { throw "jar update failed" }
 
 Write-Host "6. Zipalign APK..." -ForegroundColor Cyan
-& $zipalign -v -p 4 "$build\app-unaligned.apk" "$build\app-aligned.apk"
+& $zipalign -p 4 "$build\app-unaligned.apk" "$build\app-aligned.apk"
 if ($LASTEXITCODE -ne 0) { throw "zipalign failed" }
 
 Write-Host "7. Signing APK with debug keystore..." -ForegroundColor Cyan

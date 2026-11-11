@@ -15,7 +15,7 @@
 ### 1. Codebase Bugfixes & Branding Replacement (CloudPlayX ➔ Cloud-SSD / Cloud Drive)
 Code aur UI ke andar bache hue purane naam (`CloudPlayX` / `CLOUDPLAY X`) ko dhoondh kar theek kiya gaya:
 
-* **`src/CloudPlayX.Diagnostics/Dependencies.cs`**:
+* **`src/CloudSSD.Diagnostics/Dependencies.cs`**:
   * **Line 72:** 
     * *Before:* `"Reinstall CLOUDPLAY X or set a custom rclone path in Settings → Advanced."`
     * *After:* `"Reinstall Cloud-SSD or set a custom rclone path in Settings → Advanced."`
@@ -23,17 +23,17 @@ Code aur UI ke andar bache hue purane naam (`CloudPlayX` / `CLOUDPLAY X`) ko dho
     * *Before:* `"Enable Windows Developer Mode... CLOUDPLAY X will not change this for you."`
     * *After:* `"Enable Windows Developer Mode... Cloud-SSD will not change this for you."`
 
-* **`src/CloudPlayX.Desktop/ViewModels/ConfigViewModels.cs`**:
+* **`src/CloudSSD.Desktop/ViewModels/ConfigViewModels.cs`**:
   * **Line 102:** Cache directory check ko `CloudPlayX-cache` se badal kar **`Cloud-SSD-cache`** kiya.
   * **Line 361:** Diagnostics export zip ka filename `cloudplayx-diagnostics-...` se badal kar **`cloudssd-diagnostics-{timestamp}.zip`** kiya.
 
-* **`src/CloudPlayX.Desktop/Views/FirstRunWindow.xaml.cs`**:
+* **`src/CloudSSD.Desktop/Views/FirstRunWindow.xaml.cs`**:
   * **Line 41:** Default cache path `Path.Combine(best.Name, "CloudPlayX", "cache")` ko badal kar **`Path.Combine(best.Name, "Cloud-SSD", "cache")`** kiya.
   * **Line 69:** Folder picker default ko `CloudPlayX-cache` se badal kar **`Cloud-SSD-cache`** kiya.
 
 * **Binary / Output Assembly Name**:
   * Output executable name ko badal kar **`Cloud-SSD.exe`** kiya gaya (`<AssemblyName>Cloud-SSD</AssemblyName>`).
-  * Inno Setup installer scripts (`CloudPlayX.iss`, `Install-CloudPlayX.ps1`, `Uninstall-CloudPlayX.ps1`) ko update kiya gaya taaki desktop shortcuts aur uninstaller display icon seedhe `Cloud-SSD.exe` ko point karein.
+  * Inno Setup installer scripts (`CloudSSD.iss`, `Install-CloudSSD.ps1`, `Uninstall-CloudSSD.ps1`) ko update kiya gaya taaki desktop shortcuts aur uninstaller display icon seedhe `Cloud-SSD.exe` ko point karein.
 
 ---
 
@@ -167,7 +167,7 @@ Poore project aur compiled binary files ki gehri jaanch ki gayi:
      - Updated Android app display name to **Cloud Drive** in strings.xml.
   2. **Mobile Web Assets & JavaScript Engine Refactoring**:
      - Extensive overhaul of pp.js, pp.css, and index.html with improved responsive layouts, device orientation adaptations, and faster telemetry socket handlers.
-     - Synced assets between mobile-android/ and src/CloudPlayX.Desktop/wwwroot/mobile/.
+     - Synced assets between mobile-android/ and src/CloudSSD.Desktop/wwwroot/mobile/.
   3. **Fresh Windows Setup Installer (Inno Setup 6)**:
      - Recompiled Cloud-SSD-0.7.0-setup.exe (68.7 MB, SHA256: ca71320de1043bd105c2609ffcb8d2dadd59fe1ae035fe52ab9111f6ad63cb4f).
   4. **GitHub Releases Deployment**:
@@ -194,9 +194,9 @@ Poore project aur compiled binary files ki gehri jaanch ki gayi:
   1. **Forensic Rebranding across Codebase & Docs**:
      - Systematically replaced all occurrences of CLOUDPLAY X, CloudPlay X, cloudplay x with Cloud-SSD in:
        - Core documentation: ARCHITECTURE.md, BENCHMARKS.md, BUILD_STATUS.md, COMPATIBILITY.md, CONTRIBUTING.md, KNOWN_LIMITATIONS.md, LICENSE, SECURITY.md, TEST_REPORT.md, THIRD_PARTY_NOTICES.md, docs/*.
-       - Benchmark files: enchmarks/CloudPlayX.Benchmarks/Program.cs, enchmarks/results/*.
+       - Benchmark files: enchmarks/CloudSSD.Benchmarks/Program.cs, enchmarks/results/*.
        - Source code doc-comments & pipes: AppHost.cs, CacheInspector.cs, DiskSafety.cs, ReadAttribution.cs, ExecutionModes.cs, GameLauncher.cs, GameLibrary.cs, MountPlanning.cs, MountService.cs, RcloneConfigService.cs, Providers.cs, Predictions.cs, PrefetchScheduler.cs, StreamingEngine.cs, GameSettingsWindow.xaml.cs.
-       - Desktop WPF UI: MainWindow.xaml (Title="Cloud-SSD"), CloudPlayX.Desktop.csproj (Product, Title, Description), pp.manifest.
+       - Desktop WPF UI: MainWindow.xaml (Title="Cloud-SSD"), CloudSSD.Desktop.csproj (Product, Title, Description), pp.manifest.
   2. **5TB Multi-Drive Pooling Scripts Integration**:
      - Migrated useful standalone scripts from Cloud-SSD-5TB into 	ools/5tb-scripts/ (GUI App, Manager, Mount/Unmount batch scripts, and helper PowerShell modules).
      - Excluded sensitive user credentials (clone.conf), temporary logs, and duplicate 85MB rclone binary.

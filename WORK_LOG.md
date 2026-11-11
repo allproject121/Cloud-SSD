@@ -25,11 +25,11 @@ All operations, migrations, bug fixes, and feature additions across Cloud-SSD ar
 - **Status**: COMPLETED
 - **Files Modified**: 
   - `Directory.Build.props`
-  - `src/CloudPlayX.Desktop/MainWindow.xaml`
-  - `src/CloudPlayX.Desktop/App.xaml.cs`
-  - `src/CloudPlayX.Core/Config/AppPaths.cs`
-  - `src/CloudPlayX.Desktop/LocalizationManager.cs`
-  - `src/CloudPlayX.Mount/MountPlanning.cs`
+  - `src/CloudSSD.Desktop/MainWindow.xaml`
+  - `src/CloudSSD.Desktop/App.xaml.cs`
+  - `src/CloudSSD.Core/Config/AppPaths.cs`
+  - `src/CloudSSD.Desktop/LocalizationManager.cs`
+  - `src/CloudSSD.Mount/MountPlanning.cs`
   - All desktop XAML views & core services
 - **Code Integrity Check**: VERIFIED
 - **Details & Output**: Entire repository and user-facing UI rebranded to Cloud-SSD.
@@ -39,7 +39,7 @@ All operations, migrations, bug fixes, and feature additions across Cloud-SSD ar
 - **Task**: Installer Mount Lock Fix & Multi-Agent Segregation
 - **Status**: COMPLETED
 - **Files Modified**: 
-  - `installer/CloudPlayX.iss`
+  - `installer/CloudSSD.iss`
   - `ANTIGRAVITY.md`
   - `CODEX.md`
 - **Code Integrity Check**: VERIFIED
@@ -50,19 +50,19 @@ All operations, migrations, bug fixes, and feature additions across Cloud-SSD ar
 - **Task**: Complete Implementation of Cloud-SSD Mobile Hub (Offline Phone Bridge & PWA Client)
 - **Status**: COMPLETED
 - **Files Created / Modified**:
-  - `src/CloudPlayX.App/LocalMobileBridgeService.cs` (Created: Embedded zero-admin async HTTP server on port 8090 with HTTP 206 partial content streaming, status, HUD, files, pairing, upload & download endpoints)
-  - `src/CloudPlayX.App/AppHost.cs` (Integrated `MobileBridge` lifecycle in constructor, `InitializeAsync`, and `DisposeAsync`)
-  - `src/CloudPlayX.Desktop/QrCodeGenerator.cs` (Created: Pure C# ISO/IEC 18004 QR Code generator rendering crisp WPF `BitmapSource` with 0 external dependencies)
-  - `src/CloudPlayX.Desktop/ViewModels/MobileHubViewModel.cs` (Created: Desktop MVVM logic for server toggle, QR code, paired devices, live speed gauge, and folder pickers)
-  - `src/CloudPlayX.Desktop/Views/MobileHubView.xaml` & `MobileHubView.xaml.cs` (Created: Modern desktop UI for phone pairing, access permissions, speed monitor, quick drop zone)
-  - `src/CloudPlayX.Desktop/MainWindow.xaml` & `MainViewModel.cs` (Wired up Mobile Hub navigation item and data template)
-  - `src/CloudPlayX.Desktop/CloudPlayX.Desktop.csproj` (Added `wwwroot\**` copy to output directory)
-  - `src/CloudPlayX.Desktop/wwwroot/mobile/index.html` (Created: Mobile PWA 5-screen UI: Home, Files, Gaming, Vault, Settings)
-  - `src/CloudPlayX.Desktop/wwwroot/mobile/app.css` (Created: Dark Obsidian responsive stylesheet with bottom navigation bar and cards)
-  - `src/CloudPlayX.Desktop/wwwroot/mobile/app.js` (Created: PWA client logic, IndexedDB offline vault, live HUD poller, media streamer, file uploader)
-  - `src/CloudPlayX.Desktop/wwwroot/mobile/manifest.json` & `sw.js` (Created: Full PWA standalone manifest and offline service worker)
-  - `src/CloudPlayX.Desktop/wwwroot/mobile/icon-192.svg` & `icon-512.svg` (Created: PWA home screen app icons)
-  - `tests/CloudPlayX.Tests/MobileBridgeTests.cs` (Created: 4 new unit & integration tests covering QR generation, local IP resolution, REST status/HUD/pairing, and HTTP 206 range streaming)
+  - `src/CloudSSD.App/LocalMobileBridgeService.cs` (Created: Embedded zero-admin async HTTP server on port 8090 with HTTP 206 partial content streaming, status, HUD, files, pairing, upload & download endpoints)
+  - `src/CloudSSD.App/AppHost.cs` (Integrated `MobileBridge` lifecycle in constructor, `InitializeAsync`, and `DisposeAsync`)
+  - `src/CloudSSD.Desktop/QrCodeGenerator.cs` (Created: Pure C# ISO/IEC 18004 QR Code generator rendering crisp WPF `BitmapSource` with 0 external dependencies)
+  - `src/CloudSSD.Desktop/ViewModels/MobileHubViewModel.cs` (Created: Desktop MVVM logic for server toggle, QR code, paired devices, live speed gauge, and folder pickers)
+  - `src/CloudSSD.Desktop/Views/MobileHubView.xaml` & `MobileHubView.xaml.cs` (Created: Modern desktop UI for phone pairing, access permissions, speed monitor, quick drop zone)
+  - `src/CloudSSD.Desktop/MainWindow.xaml` & `MainViewModel.cs` (Wired up Mobile Hub navigation item and data template)
+  - `src/CloudSSD.Desktop/CloudSSD.Desktop.csproj` (Added `wwwroot\**` copy to output directory)
+  - `src/CloudSSD.Desktop/wwwroot/mobile/index.html` (Created: Mobile PWA 5-screen UI: Home, Files, Gaming, Vault, Settings)
+  - `src/CloudSSD.Desktop/wwwroot/mobile/app.css` (Created: Dark Obsidian responsive stylesheet with bottom navigation bar and cards)
+  - `src/CloudSSD.Desktop/wwwroot/mobile/app.js` (Created: PWA client logic, IndexedDB offline vault, live HUD poller, media streamer, file uploader)
+  - `src/CloudSSD.Desktop/wwwroot/mobile/manifest.json` & `sw.js` (Created: Full PWA standalone manifest and offline service worker)
+  - `src/CloudSSD.Desktop/wwwroot/mobile/icon-192.svg` & `icon-512.svg` (Created: PWA home screen app icons)
+  - `tests/CloudSSD.Tests/MobileBridgeTests.cs` (Created: 4 new unit & integration tests covering QR generation, local IP resolution, REST status/HUD/pairing, and HTTP 206 range streaming)
   - `installer/build-release.ps1` (Executed: Packaged full self-contained release)
 - **Code Integrity Check**: VERIFIED. 62/62 unit tests passed with 0 failures, 0 warnings.
 - **Output Artifacts**:
@@ -74,13 +74,13 @@ All operations, migrations, bug fixes, and feature additions across Cloud-SSD ar
 - **Task**: Executable Renaming to `Cloud-SSD.exe` & Release Binary Repackaging
 - **Status**: COMPLETED
 - **Files Modified**:
-  - `src/CloudPlayX.Desktop/CloudPlayX.Desktop.csproj`: Configured `<AssemblyName>Cloud-SSD</AssemblyName>` to generate `Cloud-SSD.exe`.
-  - `installer/CloudPlayX.iss`: Updated installer targets, shortcuts, uninstallation display icon, and auto-close detection to `Cloud-SSD.exe`.
-  - `installer/Install-CloudPlayX.ps1` & `Uninstall-CloudPlayX.ps1`: Added support for detecting and stopping `Cloud-SSD.exe` process and creating `Cloud-SSD.exe` shortcuts.
+  - `src/CloudSSD.Desktop/CloudSSD.Desktop.csproj`: Configured `<AssemblyName>Cloud-SSD</AssemblyName>` to generate `Cloud-SSD.exe`.
+  - `installer/CloudSSD.iss`: Updated installer targets, shortcuts, uninstallation display icon, and auto-close detection to `Cloud-SSD.exe`.
+  - `installer/Install-CloudSSD.ps1` & `Uninstall-CloudSSD.ps1`: Added support for detecting and stopping `Cloud-SSD.exe` process and creating `Cloud-SSD.exe` shortcuts.
   - `installer/Install-CloudSSD.ps1` & `Uninstall-CloudSSD.ps1`: Created direct branded script variants.
   - `installer/build-release.ps1`: Built and packaged clean `Cloud-SSD` release.
 - **Verification Results**:
-  - `dotnet test tests/CloudPlayX.Tests`: 62/62 tests passed (0 failures).
+  - `dotnet test tests/CloudSSD.Tests`: 62/62 tests passed (0 failures).
   - Published folder contains `Cloud-SSD.exe` (291 KB) and `cpx.exe` (162 KB).
   - `Cloud-SSD-0.7.0-setup.exe` (70,790,765 bytes) generated with SHA-256 `668b2d11741f2856229d411ecc5177899ce4d94ae08c4453efbc3e947eefe228`.
   - `Cloud-SSD-0.7.0-win-x64.zip` (93,674,222 bytes) generated with SHA-256 `a00857b52727f8f774edfb2b49fe03eec940e00b8a560235523b3a5cc824d67e`.
@@ -114,7 +114,7 @@ All operations, migrations, bug fixes, and feature additions across Cloud-SSD ar
 - **Task**: Laptop Desktop App Installation & Update + Full Bidirectional File Transfer Verification
 - **Status**: COMPLETED & 100% VERIFIED
 - **Files Modified / Updated**:
-  - `src/CloudPlayX.App/LocalMobileBridgeService.cs`:
+  - `src/CloudSSD.App/LocalMobileBridgeService.cs`:
     - Resolved Windows `IOException` (file locking violation) on `/api/upload` endpoint by properly scoping stream disposal and calling `await destFile.FlushAsync()` before constructing JSON response.
     - Added stream flush in `HandleDownloadEndpointAsync` and `SendResponseAsync`.
     - Enhanced error logging (`_log.LogError` / `_log.LogWarning`).
@@ -156,7 +156,7 @@ All operations, migrations, bug fixes, and feature additions across Cloud-SSD ar
   - `mobile-android/src/main/assets/app.js`:
     - Implemented instant client-side category filtering, search filtering across mounted drives, Safe folder IndexedDB storage, and Clean assistant.
   - APK & Assets Synchronization:
-    - Synced assets to `src/CloudPlayX.Desktop/wwwroot/mobile/` and local installation folders.
+    - Synced assets to `src/CloudSSD.Desktop/wwwroot/mobile/` and local installation folders.
     - Recompiled and signed `Cloud-SSD-Mobile.apk` (1.09 MB).
     - Installed updated APK on physical device `I2221`.
 - **Physical Device Screenshot Captured**:
@@ -181,7 +181,7 @@ All operations, migrations, bug fixes, and feature additions across Cloud-SSD ar
   4. *Hardware Back Button Exiting App*: `MainActivity.java` `onBackPressed()` was previously unhandled by single-page JS routing.
      - *Fix*: Wired `window.onAndroidBack()` in `app.js` to pop folder navigation stack, close search, or return to Browse tab, preventing accidental app exit.
 - **Files Modified / Updated**:
-  - `src/CloudPlayX.App/LocalMobileBridgeService.cs`: Added `/api/clean` endpoint and recursive category & search file enumeration with default folder fallbacks.
+  - `src/CloudSSD.App/LocalMobileBridgeService.cs`: Added `/api/clean` endpoint and recursive category & search file enumeration with default folder fallbacks.
   - `mobile-android/src/main/assets/app.js`: Added multi-IP discovery, view toggling, sort menu, starred collection, clean assistant, back navigation, and recursive category fetch.
   - `mobile-android/src/main/assets/app.css`: Added `.explorer-grid-view` styles for 2-column Material cards.
   - `mobile-android/src/main/java/com/cloudssd/mobile/MainActivity.java`: Verified Javascript back handler bridge.
@@ -215,7 +215,7 @@ All operations, migrations, bug fixes, and feature additions across Cloud-SSD ar
   4. *De-AI Copywriting & Natural Human Language*:
      - Replaced machine/AI jargon with authentic human-friendly phrasing across Clean, Browse, Share, and Gaming tabs.
   5. *Deployment & Hardware Verification*:
-     - Synchronized web assets across `mobile-android/src/main/assets/`, `src/CloudPlayX.Desktop/wwwroot/mobile/`, and `$env:LOCALAPPDATA\Programs\Cloud-SSD\wwwroot\mobile/`.
+     - Synchronized web assets across `mobile-android/src/main/assets/`, `src/CloudSSD.Desktop/wwwroot/mobile/`, and `$env:LOCALAPPDATA\Programs\Cloud-SSD\wwwroot\mobile/`.
      - Recompiled and signed `Cloud-SSD-Mobile.apk` (1.09 MB) via `build-apk.ps1`.
      - Installed on physical Android phone `I2221`.
 - **Hardware Verification Screenshots Captured**:
@@ -254,10 +254,10 @@ All operations, migrations, bug fixes, and feature additions across Cloud-SSD ar
      - Recompiled, zipaligned, and signed `Cloud-SSD-Mobile.apk` (1.1 MB).
      - Synced updated APK and web assets to `$env:LOCALAPPDATA\Programs\Cloud-SSD\wwwroot\mobile\` (accessible directly at `http://192.168.0.102:8090/cloudssd.apk`).
 - **Files Modified / Updated**:
-  - `src/CloudPlayX.Desktop/Views/MobileHubView.xaml`
-  - `src/CloudPlayX.Desktop/ViewModels/MobileHubViewModel.cs`
-  - `src/CloudPlayX.Desktop/Controls/Sparkline.cs`
-  - `src/CloudPlayX.App/LocalMobileBridgeService.cs`
+  - `src/CloudSSD.Desktop/Views/MobileHubView.xaml`
+  - `src/CloudSSD.Desktop/ViewModels/MobileHubViewModel.cs`
+  - `src/CloudSSD.Desktop/Controls/Sparkline.cs`
+  - `src/CloudSSD.App/LocalMobileBridgeService.cs`
   - `mobile-android/src/main/java/com/cloudssd/mobile/MainActivity.java`
   - `mobile-android/src/main/assets/app.js`
   - `mobile-android/src/main/assets/index.html`
@@ -296,12 +296,12 @@ All operations, migrations, bug fixes, and feature additions across Cloud-SSD ar
 - **Status**: COMPLETED & VERIFIED
 - **Root Cause Identified**:
   - `MobileHubView.xaml` bound `<Run Text="{Binding IpAddress}" />` and `<Run Text="{Binding LastSeenFormatted}" />`. In WPF, `Run.Text` defaults to `BindsTwoWayByDefault = true`.
-  - `PairedDeviceItem` had getter-only properties without setters, causing WPF to throw `System.InvalidOperationException: A TwoWay or OneWayToSource binding cannot work on the read-only property 'IpAddress' of type 'CloudPlayX.Desktop.ViewModels.PairedDeviceItem'`. This caused the window/view to crash or fail to open.
+  - `PairedDeviceItem` had getter-only properties without setters, causing WPF to throw `System.InvalidOperationException: A TwoWay or OneWayToSource binding cannot work on the read-only property 'IpAddress' of type 'CloudSSD.Desktop.ViewModels.PairedDeviceItem'`. This caused the window/view to crash or fail to open.
 - **Actions Taken**:
   - Updated `MobileHubView.xaml`: specified `Mode=OneWay` on all `<Run Text="{Binding ...}" />` bindings.
   - Updated `MobileHubViewModel.cs`: added `{ get; set; }` properties to `PairedDeviceItem`.
   - Audited and updated other XAML views (`AcceleratorView.xaml`, `DashboardView.xaml`, `FirstRunWindow.xaml`, `GameLibraryView.xaml`) to guarantee all `<Run Text="{Binding ...}">` bindings use `Mode=OneWay`.
-  - Rebuilt and republished `CloudPlayX.Desktop` (`win-x64` self-contained) with .NET 10.
+  - Rebuilt and republished `CloudSSD.Desktop` (`win-x64` self-contained) with .NET 10.
   - Launched `Cloud-SSD.exe` (PID 23688); verified 0 crashes, mounts active on Z: and G:, and Mobile Bridge API live on `http://192.168.0.102:8090/`.
 
 ---
@@ -334,5 +334,5 @@ All operations, migrations, bug fixes, and feature additions across Cloud-SSD ar
   5. *Build & Deployment*:
      - Compiled and signed `Cloud-SSD-Mobile.apk` (1.1 MB).
      - Published self-contained `win-x64` `Cloud-SSD.exe` and launched detached (PID 17632).
-     - Synchronized web assets across `src/CloudPlayX.Desktop/wwwroot/mobile/` and `$env:LOCALAPPDATA\Programs\Cloud-SSD\wwwroot\mobile/`.
+     - Synchronized web assets across `src/CloudSSD.Desktop/wwwroot/mobile/` and `$env:LOCALAPPDATA\Programs\Cloud-SSD\wwwroot\mobile/`.
      - Live verified `/api/status`, `/api/drives`, `/api/open-pc`, and `/api/preview`.

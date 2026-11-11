@@ -197,20 +197,20 @@ flowchart TD
 ## 🧑‍💻 Technical Specifications (For Developers)
 
 ```
-Solution: CloudPlayX.slnx (.NET 10 x64)
+Solution: CloudSSD.slnx (.NET 10 x64)
 Language: C# (Latest, Nullable enabled)
 Architecture: Clean Architecture + MVVM (CommunityToolkit.Mvvm)
 Subprojects:
-  ├── CloudPlayX.Core          -> Atomic JSON settings, paths, units, Win32 P/Invoke
-  ├── CloudPlayX.Mount         -> rclone supervisor, WinFsp mounting, log tailer
-  ├── CloudPlayX.Cache         -> Sparse file accounting, disk safety, eviction
-  ├── CloudPlayX.Streaming     -> Predictors, prefetch scheduler, network governor
-  ├── CloudPlayX.Games         -> PE analyzer, compatibility, launcher, hybrid builder
-  ├── CloudPlayX.Desktop       -> WPF modern UI, sparklines, dialogs
-  ├── CloudPlayX.Diagnostics   -> DPAPI secret store, redactor, diagnostic zip
-  ├── CloudPlayX.Providers     -> Cloud provider descriptors (Google Drive, etc.)
-  ├── CloudPlayX.Cli           -> Headless cpx.exe command line tool
-  ├── CloudPlayX.SimCloud      -> Throttled mock cloud server for testing
+  ├── CloudSSD.Core          -> Atomic JSON settings, paths, units, Win32 P/Invoke
+  ├── CloudSSD.Mount         -> rclone supervisor, WinFsp mounting, log tailer
+  ├── CloudSSD.Cache         -> Sparse file accounting, disk safety, eviction
+  ├── CloudSSD.Streaming     -> Predictors, prefetch scheduler, network governor
+  ├── CloudSSD.Games         -> PE analyzer, compatibility, launcher, hybrid builder
+  ├── CloudSSD.Desktop       -> WPF modern UI, sparklines, dialogs
+  ├── CloudSSD.Diagnostics   -> DPAPI secret store, redactor, diagnostic zip
+  ├── CloudSSD.Providers     -> Cloud provider descriptors (Google Drive, etc.)
+  ├── CloudSSD.Cli           -> Headless cpx.exe command line tool
+  ├── CloudSSD.SimCloud      -> Throttled mock cloud server for testing
   ├── mobile-android           -> Native Android companion client (WebView/PWA Bridge)
   └── tools/5tb-scripts        -> Standalone 5TB multi-account union mount scripts
 ```

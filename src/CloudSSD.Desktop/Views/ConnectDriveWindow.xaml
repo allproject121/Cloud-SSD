@@ -1,0 +1,157 @@
+<Window x:Class="CloudSSD.Desktop.Views.ConnectDriveWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Connect Cloud Account" Width="680" Height="700" Style="{StaticResource DialogWindow}" WindowStartupLocation="CenterOwner">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="26,22">
+            <TextBlock Text="Connect Cloud Account" Style="{StaticResource H1}" />
+            <TextBlock Style="{StaticResource Caption}" Margin="0,0,0,16"
+                       Text="Sign in to add an account. Its files then appear as a drive in File Explorer. You can add as many accounts as you like, one at a time." />
+
+            <!-- Provider Selection Tabs -->
+            <Border Background="{StaticResource Surface2}" CornerRadius="10" Padding="4" Margin="0,0,0,16">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <RadioButton x:Name="TabGoogle" Grid.Column="0" Content="Google Drive" IsChecked="True" Checked="OnProviderChanged"
+                                 Style="{StaticResource PillRadio}" Height="34" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" />
+                    <RadioButton x:Name="TabOneDrive" Grid.Column="1" Content="Microsoft OneDrive" Checked="OnProviderChanged"
+                                 Style="{StaticResource PillRadio}" Height="34" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" />
+                    <RadioButton x:Name="TabWebDav" Grid.Column="2" Content="WebDAV / Nextcloud" Checked="OnProviderChanged"
+                                 Style="{StaticResource PillRadio}" Height="34" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" />
+                </Grid>
+            </Border>
+
+            <!-- 1. Google Drive Panel -->
+            <StackPanel x:Name="GooglePanel">
+                <!-- Key status -->
+                <Border x:Name="KeyFoundBox" Visibility="Collapsed" CornerRadius="8" BorderThickness="1" BorderBrush="{StaticResource Success}" Background="{StaticResource Surface}" Padding="14,10" Margin="0,0,0,12">
+                    <StackPanel>
+                        <TextBlock Foreground="{StaticResource Success}" FontWeight="SemiBold" Text="✓ Your own Google key is ready — fast and not shared with anyone" />
+                        <TextBlock x:Name="KeyFileText" Style="{StaticResource Caption}" Margin="0,4,0,0" />
+                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                            <Button x:Name="TesterButton" Content="Add me as a tester (opens Google)" Style="{StaticResource Ghost}" Padding="0,2" Margin="0,0,18,0" Click="OpenTesters" />
+                            <Button Content="Use a different key file…" Style="{StaticResource Ghost}" Padding="0,2" Click="LoadKey" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <Button x:Name="QuickButton" Style="{StaticResource Primary}" HorizontalAlignment="Stretch" Padding="14,12" Click="QuickConnect" Margin="0">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE77B;" FontFamily="{StaticResource IconFont}" FontSize="16" Margin="0,0,10,0" VerticalAlignment="Center" />
+                        <TextBlock Text="Sign in with Google" FontSize="15" />
+                    </StackPanel>
+                </Button>
+                <TextBlock x:Name="ModeText" Style="{StaticResource Caption}" Margin="0,8,0,0" Foreground="{StaticResource Dim}" />
+
+                <!-- Everything about Google keys is optional and stays folded away; signing in needs only the button above. -->
+                <CheckBox x:Name="AdvancedBox" Margin="0,14,0,0" Content="Advanced: use my own Google key (optional)" Checked="AdvancedChanged" Unchecked="AdvancedChanged" />
+                <StackPanel x:Name="AdvancedPanel" Visibility="Collapsed" Margin="26,10,0,0">
+                    <!-- Shown when no key file exists yet -->
+                    <Border x:Name="GetKeyBox" CornerRadius="8" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Background="{StaticResource Surface}" Padding="14,10" Margin="0,0,0,14">
+                        <StackPanel>
+                            <TextBlock FontWeight="SemiBold" Text="Your own free Google key (one time) keeps drives fast and working after rclone's shared login is retired:" TextWrapping="Wrap" />
+                            <TextBlock Style="{StaticResource Caption}" Margin="0,4,0,8" TextWrapping="Wrap"
+                                       Text="In Google Cloud: Clients → your Desktop client → Download JSON (or create one: Create client → Desktop app). Cloud-SSD finds the file in Downloads automatically." />
+                            <StackPanel Orientation="Horizontal">
+                                <Button Content="1. Open Google Cloud" Click="OpenConsole" />
+                                <Button Content="2. I downloaded it — find key" Click="FindKey" />
+                                <Button Content="Choose file…" Style="{StaticResource Ghost}" Click="LoadKey" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                    <TextBlock Text="OAUTH CLIENT ID" Style="{StaticResource Label}" />
+                    <TextBox x:Name="ClientIdBox" Margin="0,0,0,10" />
+                    <TextBlock Text="OAUTH CLIENT SECRET" Style="{StaticResource Label}" />
+                    <PasswordBox x:Name="SecretBox" Margin="0,0,0,10" />
+                    <TextBlock Text="ROOT FOLDER ID (optional — limit access to one Drive folder)" Style="{StaticResource Label}" />
+                    <TextBox x:Name="RootBox" Margin="0,0,0,10" />
+                    <Button x:Name="ConnectButton" Style="{StaticResource Primary}" Content="Connect with this key" HorizontalAlignment="Left" Click="Connect" />
+                </StackPanel>
+            </StackPanel>
+
+            <!-- 2. Microsoft OneDrive Panel -->
+            <StackPanel x:Name="OneDrivePanel" Visibility="Collapsed">
+                <Border CornerRadius="8" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Background="{StaticResource Surface}" Padding="14,12" Margin="0,0,0,14">
+                    <StackPanel>
+                        <TextBlock Text="Microsoft OneDrive &amp; SharePoint" FontWeight="SemiBold" FontSize="14" />
+                        <TextBlock Style="{StaticResource Caption}" Margin="0,4,0,0" TextWrapping="Wrap"
+                                   Text="Connect your personal Microsoft OneDrive (5 GB free / 1 TB with Office 365) or work/school SharePoint account. Sign in happens safely in your browser." />
+                    </StackPanel>
+                </Border>
+
+                <TextBlock Text="ACCOUNT TYPE" Style="{StaticResource Label}" Margin="0,0,0,4" />
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                    <RadioButton x:Name="OneDrivePersonalRadio" Content="Personal OneDrive" IsChecked="True" Margin="0,0,20,0" />
+                    <RadioButton x:Name="OneDriveBusinessRadio" Content="Business / School / SharePoint" />
+                </StackPanel>
+
+                <Button x:Name="OneDriveQuickButton" Style="{StaticResource Primary}" HorizontalAlignment="Stretch" Padding="14,12" Click="ConnectOneDrive" Margin="0">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE774;" FontFamily="{StaticResource IconFont}" FontSize="16" Margin="0,0,10,0" VerticalAlignment="Center" />
+                        <TextBlock Text="Sign in with Microsoft" FontSize="15" />
+                    </StackPanel>
+                </Button>
+                <TextBlock Style="{StaticResource Caption}" Margin="0,8,0,0" Foreground="{StaticResource Dim}"
+                           Text="A browser window will open to Microsoft's official sign-in page." />
+
+                <CheckBox x:Name="OneDriveAdvancedBox" Margin="0,14,0,0" Content="Advanced: Use custom Azure Application Client ID" Checked="OneDriveAdvancedChanged" Unchecked="OneDriveAdvancedChanged" />
+                <StackPanel x:Name="OneDriveAdvancedPanel" Visibility="Collapsed" Margin="26,10,0,0">
+                    <TextBlock Text="AZURE CLIENT ID" Style="{StaticResource Label}" />
+                    <TextBox x:Name="OneDriveClientIdBox" Margin="0,0,0,10" />
+                    <TextBlock Text="AZURE CLIENT SECRET (optional)" Style="{StaticResource Label}" />
+                    <PasswordBox x:Name="OneDriveSecretBox" Margin="0,0,0,10" />
+                </StackPanel>
+            </StackPanel>
+
+            <!-- 3. WebDAV / Nextcloud Panel -->
+            <StackPanel x:Name="WebDavPanel" Visibility="Collapsed">
+                <Border CornerRadius="8" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" Background="{StaticResource Surface}" Padding="14,12" Margin="0,0,0,14">
+                    <StackPanel>
+                        <TextBlock Text="Nextcloud, ownCloud &amp; WebDAV" FontWeight="SemiBold" FontSize="14" />
+                        <TextBlock Style="{StaticResource Caption}" Margin="0,4,0,0" TextWrapping="Wrap"
+                                   Text="Connect your private Nextcloud, home NAS, Seedbox, or any standard WebDAV cloud storage." />
+                    </StackPanel>
+                </Border>
+
+                <TextBlock Text="SERVER WEBDAV URL" Style="{StaticResource Label}" />
+                <TextBox x:Name="WebDavUrlBox" Text="https://" Margin="0,0,0,10" />
+                <TextBlock Style="{StaticResource Caption}" Foreground="{StaticResource Dim}" Margin="0,-6,0,10"
+                           Text="Example: https://cloud.example.com/remote.php/dav/files/myusername/" />
+
+                <TextBlock Text="SERVICE TYPE / VENDOR" Style="{StaticResource Label}" />
+                <ComboBox x:Name="WebDavVendorBox" SelectedIndex="0" Margin="0,0,0,10">
+                    <ComboBoxItem Content="nextcloud" />
+                    <ComboBoxItem Content="owncloud" />
+                    <ComboBoxItem Content="fastmail" />
+                    <ComboBoxItem Content="other" />
+                </ComboBox>
+
+                <TextBlock Text="USERNAME" Style="{StaticResource Label}" />
+                <TextBox x:Name="WebDavUserBox" Margin="0,0,0,10" />
+
+                <TextBlock Text="PASSWORD OR APP TOKEN" Style="{StaticResource Label}" />
+                <PasswordBox x:Name="WebDavPassBox" Margin="0,0,0,14" />
+
+                <Button x:Name="WebDavConnectButton" Style="{StaticResource Primary}" HorizontalAlignment="Stretch" Padding="14,12" Click="ConnectWebDav">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE753;" FontFamily="{StaticResource IconFont}" FontSize="16" Margin="0,0,10,0" VerticalAlignment="Center" />
+                        <TextBlock Text="Connect WebDAV Storage" FontSize="15" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+
+            <CheckBox x:Name="ReadOnlyBox" Margin="0,16,0,0" Content="Read-only access (protects cloud files; no writing or installing on it)" />
+
+            <TextBlock x:Name="Status" Style="{StaticResource Caption}" Margin="0,16,0,0" Foreground="{StaticResource Accent}" MaxHeight="120" TextTrimming="CharacterEllipsis" TextWrapping="Wrap" />
+            <Button x:Name="FixButton" Style="{StaticResource Primary}" HorizontalAlignment="Left" Margin="0,10,0,0" Visibility="Collapsed" Click="OpenFix" />
+            <ProgressBar x:Name="Progress" IsIndeterminate="True" Margin="0,8,0,0" Visibility="Collapsed" />
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0">
+                <Button Content="Cancel" Click="Cancel" Margin="0" />
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</Window>

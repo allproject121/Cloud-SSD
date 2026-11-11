@@ -55,7 +55,7 @@ Set-ItemProperty $key InstallLocation $InstallDir
 Set-ItemProperty $key DisplayIcon "$exe,0"
 Set-ItemProperty $key NoModify 1 -Type DWord
 Set-ItemProperty $key NoRepair 1 -Type DWord
-Set-ItemProperty $key UninstallString "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$InstallDir\Uninstall-CloudPlayX.ps1`""
+Set-ItemProperty $key UninstallString "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$InstallDir\Uninstall-CloudSSD.ps1`""
 $size = [int]((Get-ChildItem $InstallDir -Recurse -File | Measure-Object Length -Sum).Sum / 1KB)
 Set-ItemProperty $key EstimatedSize $size -Type DWord
 

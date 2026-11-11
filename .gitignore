@@ -14,3 +14,6 @@ installer/google-client.json
 # Local Claude Code session files
 .claude/
 mobile-android/build/
+
+# Google key for sign-in on the phone (see SETUP.md) - never commit it
+mobile-android/google-oauth.json

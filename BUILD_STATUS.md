@@ -10,7 +10,7 @@ rclone 1.75.2, .NET 10.0.3. Test results: [TEST_REPORT.md](TEST_REPORT.md).
 
 | Feature | Status | Notes |
 |---|---|---|
-| Repository, solution, 12 projects, DI-friendly services | ✅ | `CloudPlayX.slnx` |
+| Repository, solution, 12 projects, DI-friendly services | ✅ | `CloudSSD.slnx` |
 | Desktop application (WPF, MVVM, 8 pages, dialogs) | ✅ | Launched on this PC, auto-mounted a drive, live metrics rendered (screenshot verified). Pages driven by UI Automation for screenshots; most dialogs not click-tested |
 | rclone integration (discovery, version, flag capability detection) | ✅ | |
 | WinFsp detection | ✅ | |
